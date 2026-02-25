@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <!-- <script src="GridPathGenerator.js"></script> -->
+    <script defer src="js/GridPath.js"></script>
+    <script defer src="js/main.js"></script>
+    <style>
+        body{
+            background-color: #000;
+        }
+        #svg{
+            width: 100vw;
+            height: 100vh;
+        }
+        #svg > path{
+            stroke: red;
+            stroke-width: 5px;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+        }
+       
+        #svg > path.arrowElement{
+            marker-end: url(#arrow-head);
+            pointer-events: none;
+        }
+        #svg > path.collisionElement{
+            opacity: 0.01;
+            stroke-width: 25px;
+            stroke: white;
+        }
+        #svg > path.collisionElement:hover + path.arrowElement{
+            opacity: 0.7;
+        }
+        #svg > path.collided{
+            filter: hue-rotate(0deg) !important;
+        }
+        #svg >g> rect{
+            fill: rgba(127, 127, 127, 0.3);
+            /* stroke: rgba(255, 255, 255, 0.1); */
+            stroke-width: 1;
+            rx: 5;
+            ry: 5;
+            width: 3px;
+            height: 3px;
+        }
+    </style>
+</head>
+<body>
+    <svg id="svg" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <marker id="arrow-head" class="canvas-object-conn-head" stroke="red" fill="red" markerWidth="90" markerHeight="5" refX="14" refY="12" orient="auto" markerUnits="strokeWidth" viewBox="0 0 20 20" >
+            <path d="M8 5v14l9-7z" stroke-linejoin="round" stroke-linecap="round" ></path>
+            <!-- <path d="M50,50 h100 a20,20 0 0 1 20,20 v100 a20,20 0 0 1 -20,20 h-100 a20,20 0 0 1 -20,-20 v-100 a20,20 0 0 1 20,-20 z"/> -->
+            </marker>
+            <marker id="arrow-head-selected" class="canvas-object-conn-head selected" markerWidth="5" markerHeight="5" refX="18" refY="12" orient="auto" markerUnits="strokeWidth" viewBox="0 0 20 20">
+            <path d="M8 5v14l11-7z"></path>
+            </marker>
+            <linearGradient id="linear" x1="0%" y1="0%" x2="100%" y2="20%">
+                <stop offset="0%" stop-color="#05a"></stop>
+                <stop offset="70%" stop-color="#0089bf"></stop>
+            </linearGradient>
+            <linearGradient id="linear-ref-dep" x1="30%" y1="0%" x2="80%" y2="0%">
+                <stop offset="0%" stop-color="#12a900"></stop>
+                <stop offset="70%" stop-color="#ff7500"></stop>
+            </linearGradient>
+            <linearGradient id="linear-ref" x1="30%" y1="0%" x2="80%" y2="0%">
+                <stop offset="0%" stop-color="#12a900"></stop>
+                <stop offset="70%" stop-color="#12a900"></stop>
+            </linearGradient>
+            <linearGradient id="linear-dep" x1="30%" y1="0%" x2="80%" y2="0%">
+                <stop offset="0%" stop-color="#ff7500"></stop>
+                <stop offset="70%" stop-color="#ff7500"></stop>
+            </linearGradient>
+        </defs>
+
+    </svg>
+</body>
+</html>

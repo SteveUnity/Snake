@@ -1,0 +1,89 @@
+<svg id="svg" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 400px; height: 400px;">
+    <defs>
+        <marker id="arrow-head" class="canvas-object-conn-head" stroke="red" fill="red"
+            markerWidth="90" markerHeight="5" refX="14" refY="12" orient="auto"
+            markerUnits="strokeWidth" viewBox="0 0 20 20">
+            <path d="M8 5v14l9-7z" stroke-linejoin="round" stroke-linecap="round"></path>
+            <!-- <path d="M50,50 h100 a20,20 0 0 1 20,20 v100 a20,20 0 0 1 -20,20 h-100 a20,20 0 0 1
+            -20,-20 v-100 a20,20 0 0 1 20,-20 z"/> -->
+        </marker>
+        <marker id="arrow-head-selected" class="canvas-object-conn-head selected" markerWidth="5"
+            markerHeight="5" refX="18" refY="12" orient="auto" markerUnits="strokeWidth"
+            viewBox="0 0 20 20">
+            <path d="M8 5v14l11-7z"></path>
+        </marker>
+        <linearGradient id="linear" x1="0%" y1="0%" x2="100%" y2="20%">
+            <stop offset="0%" stop-color="#05a"></stop>
+            <stop offset="70%" stop-color="#0089bf"></stop>
+        </linearGradient>
+        <linearGradient id="linear-ref-dep" x1="30%" y1="0%" x2="80%" y2="0%">
+            <stop offset="0%" stop-color="#12a900"></stop>
+            <stop offset="70%" stop-color="#ff7500"></stop>
+        </linearGradient>
+        <linearGradient id="linear-ref" x1="30%" y1="0%" x2="80%" y2="0%">
+            <stop offset="0%" stop-color="#12a900"></stop>
+            <stop offset="70%" stop-color="#12a900"></stop>
+        </linearGradient>
+        <linearGradient id="linear-dep" x1="30%" y1="0%" x2="80%" y2="0%">
+            <stop offset="0%" stop-color="#ff7500"></stop>
+            <stop offset="70%" stop-color="#ff7500"></stop>
+        </linearGradient>
+    </defs>
+
+ 
+    <path d="M 50 300 L 50 325" style="filter: hue-rotate(109deg);"></path>
+    <path
+        d="M 250 125 L 230 125 Q 225 125 220 125 L 205 125 Q 200 125 195 125 L 180 125 Q 175 125 170 125 L 155 125 Q 150 125 145 125 L 130 125 Q 125 125 125 120 L 125 105 Q 125 100 125 95 L 125 80 Q 125 75 125 70 L 125 55 Q 125 50 120 50 L 100 50"
+        style="filter: hue-rotate(139deg);"></path>
+    <path d="M 325 250 L 325 275" style="filter: hue-rotate(233deg);"></path>
+    <path d="M 250 50 L 225 50" style="filter: hue-rotate(122deg);"></path>
+    <path
+        d="M 150 300 L 170 300 Q 175 300 175 295 L 175 280 Q 175 275 180 275 L 195 275 Q 200 275 205 275 L 220 275 Q 225 275 230 275 L 245 275 Q 250 275 255 275 L 270 275 Q 275 275 275 280 L 275 295 Q 275 300 275 305 L 275 320 Q 275 325 270 325 L 250 325"
+        style="filter: hue-rotate(86deg);"></path>
+    <path d="M 300 50 L 275 50" style="filter: hue-rotate(62deg);"></path>
+    <path d="M 75 125 L 50 125" style="filter: hue-rotate(226deg);"></path>
+    <path
+        d="M 200 75 L 200 95 Q 200 100 195 100 L 180 100 Q 175 100 175 95 L 175 80 Q 175 75 175 70 L 175 55 Q 175 50 170 50 L 150 50"
+        style="filter: hue-rotate(275deg);"></path>
+    <path d="M 150 325 L 175 325" style="filter: hue-rotate(302deg);"></path>
+    <path d="M 250 300 L 230 300 Q 225 300 220 300 L 205 300 Q 200 300 200 305 L 200 325"
+        style="filter: hue-rotate(268deg);"></path>
+    <path d="M 125 300 L 125 325" style="filter: hue-rotate(136deg);"></path>
+    <path
+        d="M 300 300 L 300 280 Q 300 275 300 270 L 300 255 Q 300 250 300 245 L 300 230 Q 300 225 300 220 L 300 205 Q 300 200 300 195 L 300 180 Q 300 175 300 170 L 300 155 Q 300 150 300 145 L 300 130 Q 300 125 300 120 L 300 105 Q 300 100 305 100 L 325 100"
+        style="filter: hue-rotate(88deg);"></path>
+    <path d="M 75 75 L 75 50" style="filter: hue-rotate(307deg);"></path>
+    <path
+        d="M 150 200 L 150 220 Q 150 225 150 230 L 150 245 Q 150 250 150 255 L 150 270 Q 150 275 145 275 L 130 275 Q 125 275 120 275 L 105 275 Q 100 275 95 275 L 80 275 Q 75 275 75 280 L 75 295 Q 75 300 75 305 L 75 320 Q 75 325 80 325 L 100 325"
+        style="filter: hue-rotate(265deg);"></path>
+    <path d="M 325 200 L 325 225" style="filter: hue-rotate(225deg);"></path>
+    <path d="M 75 225 L 50 225" style="filter: hue-rotate(132deg);"></path>
+    <path
+        d="M 150 175 L 130 175 Q 125 175 125 180 L 125 195 Q 125 200 125 205 L 125 220 Q 125 225 120 225 L 105 225 Q 100 225 100 220 L 100 205 Q 100 200 100 195 L 100 180 Q 100 175 95 175 L 80 175 Q 75 175 70 175 L 55 175 Q 50 175 50 180 L 50 200"
+        style="filter: hue-rotate(205deg);"></path>
+    <path
+        d="M 125 250 L 105 250 Q 100 250 95 250 L 80 250 Q 75 250 70 250 L 55 250 Q 50 250 50 255 L 50 275"
+        style="filter: hue-rotate(193deg);"></path>
+    <path d="M 75 150 L 50 150" style="filter: hue-rotate(118deg);"></path>
+    <path d="M 300 325 L 320 325 Q 325 325 325 320 L 325 300" style="filter: hue-rotate(308deg);"></path>
+    <path d="M 325 150 L 325 175" style="filter: hue-rotate(62deg);"></path>
+    <path d="M 50 50 L 50 75" style="filter: hue-rotate(222deg);"></path>
+    <path d="M 75 100 L 50 100" style="filter: hue-rotate(240deg);"></path>
+    <path d="M 325 50 L 325 75" style="filter: hue-rotate(99deg);"></path>
+    <path d="M 275 225 L 275 200" style="filter: hue-rotate(323deg);"></path>
+    <path d="M 100 100 L 100 75" style="filter: hue-rotate(44deg);"></path>
+    <path
+        d="M 250 150 L 230 150 Q 225 150 225 155 L 225 170 Q 225 175 220 175 L 205 175 Q 200 175 200 170 L 200 155 Q 200 150 195 150 L 180 150 Q 175 150 170 150 L 155 150 Q 150 150 145 150 L 130 150 Q 125 150 120 150 L 105 150 Q 100 150 100 145 L 100 125"
+        style="filter: hue-rotate(164deg);"></path>
+    <path d="M 175 200 L 175 225" style="filter: hue-rotate(107deg);"></path>
+    <path d="M 200 225 L 200 250" style="filter: hue-rotate(341deg);"></path>
+    <path d="M 225 200 L 250 200" style="filter: hue-rotate(104deg);"></path>
+    <path d="M 225 250 L 245 250 Q 250 250 250 245 L 250 230 Q 250 225 245 225 L 225 225"
+        style="filter: hue-rotate(113deg);"></path>
+    <path d="M 150 75 L 150 100" style="filter: hue-rotate(124deg);"></path>
+    <path d="M 275 125 L 275 150" style="filter: hue-rotate(116deg);"></path>
+    <path d="M 250 175 L 275 175" style="filter: hue-rotate(279deg);"></path>
+    <path
+        d="M 250 75 L 270 75 Q 275 75 275 80 L 275 95 Q 275 100 270 100 L 255 100 Q 250 100 245 100 L 230 100 Q 225 100 225 95 L 225 75"
+        style="filter: hue-rotate(355deg);"></path>
+</svg>
