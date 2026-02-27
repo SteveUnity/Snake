@@ -15,11 +15,7 @@ function seededRandomGenerator(seed) {
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
 }
-let rngSeed = parseInt(localStorage.getItem("rngSeed") || "0");
-if (rngSeed == 0) {
-    rngSeed = Math.floor(Math.random() * 4836651);
-    localStorage.setItem("rngSeed", rngSeed.toString());
-}
+let rngSeed = props.level > 0 ? props.level : Math.floor(Math.random() * 4836651);
 const rng = seededRandomGenerator(rngSeed);
 function Rand() {
     return seededRandomGenerator(rngSeed++)();
@@ -31,8 +27,8 @@ function Rand() {
 //         height = innerHeight;
 //     console.log({width, height,innerWidth:window.innerWidth,innerHeight:window.innerHeight});
 // }
-const gridPath = new GridPath();
-document.getElementById("arrow-head")?.setAttribute("markerHeight", scale / 6 + '');
+let gridPath = new GridPath();
+document.getElementById("arrow-head")?.setAttribute("markerHeight", props.scale / 6 + '');
 let maxX = 0;
 let maxY = 0;
 // function drawArrow(points: any) {
@@ -49,19 +45,19 @@ function drawGrid(x, y) {
     for (let i = 1; i <= x + 2; i++) {
         for (let j = 1; j <= y + 2; j++) {
             const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            rect.setAttribute("x", (i * scale).toString());
-            rect.setAttribute("y", (j * scale).toString());
+            rect.setAttribute("x", (i * props.scale).toString());
+            rect.setAttribute("y", (j * props.scale).toString());
             group.appendChild(rect);
         }
     }
 }
 const svg = document.getElementById("svg");
 let count = 0;
-drawGrid(width, height);
+drawGrid(props.width, props.height);
 if (svg) {
     // inner width
-    svg.style.width = `${width * scale + 100}px`;
-    svg.style.height = `${height * scale + 100}px`;
+    svg.style.width = `${props.width * props.scale + 100}px`;
+    svg.style.height = `${props.height * props.scale + 100}px`;
 }
 let arrows = [];
 async function clear() {
@@ -76,10 +72,12 @@ async function clear() {
         }, 1);
     });
 }
+let root = document.createElementNS("http://www.w3.org/2000/svg", "g");
 function draw() {
+    svg?.appendChild(root);
     console.log("Grid", JSON.parse(JSON.stringify(gridPath.Grid)));
     console.log("draw");
-    for (let i = 0; i < maxRank; i++) {
+    for (let i = 0; i < props.maxRank; i++) {
         let cells = gridPath.getPeremeterCells(i);
         cells = cells.sort((a, b) => Rand() - 0.5);
         console.log(`get Peremeter Cells ${i}`, JSON.parse(JSON.stringify(cells)));
@@ -88,14 +86,35 @@ function draw() {
         for (let cell of cells) {
             if (cell.Arrow != null)
                 continue;
-            let arrow = gridPath.GenerateArrow(cell, maxLength, i);
+            let arrow = gridPath.GenerateArrow(cell, props.maxLength, i);
             if (arrow == null)
                 continue;
             let [arrowElement, collisionElement] = arrow.GetArrowElement();
             arrows.push(arrowElement);
             arrows.push(collisionElement);
-            svg?.appendChild(collisionElement);
-            svg?.appendChild(arrowElement);
+            root?.appendChild(collisionElement);
+            root?.appendChild(arrowElement);
+            gridPath.AddArrow(arrow);
+        }
+    }
+    for (let i = 0; i < props.maxRank; i++) {
+        let cells = gridPath.getPeremeterCells(i);
+        cells = cells.sort((a, b) => Rand() - 0.5);
+        console.log(`get Peremeter Cells ${i}`, JSON.parse(JSON.stringify(cells)));
+        cells = cells.filter(cell => cell.Arrow == null);
+        console.log(`get Empty Peremeter Cells ${i}`, JSON.parse(JSON.stringify(cells)));
+        for (let cell of cells) {
+            if (cell.Arrow != null)
+                continue;
+            let arrow = gridPath.GenerateArrow(cell, props.maxLength, i);
+            if (arrow == null)
+                continue;
+            let [arrowElement, collisionElement] = arrow.GetArrowElement();
+            arrows.push(arrowElement);
+            arrows.push(collisionElement);
+            root?.appendChild(collisionElement);
+            root?.appendChild(arrowElement);
+            gridPath.AddArrow(arrow);
         }
     }
     // count++;
@@ -130,11 +149,25 @@ function draw() {
     // }
 }
 draw();
-let button = document.createElement("button");
-button.innerHTML = "reload";
-button.addEventListener("click", () => {
-    rngSeed = Math.floor(Math.random() * 4836651);
-    localStorage.setItem("rngSeed", rngSeed.toString());
-    location.reload();
-});
-document.body.appendChild(button);
+function restart() {
+    rngSeed = document.getElementById("level")?.valueAsNumber ?? 1;
+    if (rngSeed == 0) {
+        rngSeed = Math.floor(Math.random() * 4836651);
+    }
+    props.level = document.getElementById("level")?.valueAsNumber ?? 1;
+    props.width = document.getElementById("width")?.valueAsNumber ?? 20;
+    props.height = document.getElementById("height")?.valueAsNumber ?? 20;
+    props.maxLength = document.getElementById("maxLength")?.valueAsNumber ?? 20;
+    props.jiggle = document.getElementById("jiggle")?.valueAsNumber ?? 0;
+    props.straightness = document.getElementById("straightness")?.valueAsNumber ?? 0.95;
+    localStorage.setItem("props", JSON.stringify(props));
+    rngSeed = props.level > 0 ? props.level : Math.floor(Math.random() * 4836651);
+    root?.remove();
+    root = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    gridPath = new GridPath();
+    if (svg) {
+        svg.style.width = `${props.width * props.scale + 100}px`;
+        svg.style.height = `${props.height * props.scale + 100}px`;
+    }
+    draw();
+}

@@ -1,23 +1,53 @@
-const width = 60;
-const height = 60;
-const maxRank = Math.floor(Math.min(width, height)/2);
-const scale = 25;
-const maxLength = 20;
-const offset = 2;
-const jiggle = 0;
-const radius = 4;
-const straightness = 0.95;
+const props:{
+    level: number;
+    width: number;
+    height: number;
+    maxLength: number;
+    jiggle: number;
+    straightness: number;
+    maxRank: number;
+    scale: number;
+    offset: number;
+    radius: number;
+} =JSON.parse(localStorage.getItem("props")??  `{
+    "level" : 1,
+    "width" : 20,
+    "height" : 20,
+    "maxLength" : 20,
+    "jiggle" : 0,
+    "straightness" : 0.95
+}`);
 
-
+props.maxRank = Math.floor(Math.min(props.width, props.height)/2);
+props.scale = 25;
+props.offset = 2;
+props.radius = 4;
+(<HTMLInputElement>document.getElementById("level")).value = props.level.toString();
+(<HTMLInputElement>document.getElementById("width")).value = props.width.toString();
+(<HTMLInputElement>document.getElementById("height")).value = props.height.toString();
+(<HTMLInputElement>document.getElementById("maxLength")).value = props.maxLength.toString();
+(<HTMLInputElement>document.getElementById("jiggle")).value = props.jiggle.toString();
+(<HTMLInputElement>document.getElementById("straightness")).value = props.straightness.toString();
 class GridPath{
     private grid: Array<Array<Cell>> = [];
+    private arrows: Map<string, Arrow> = new Map();
+    public DeleteArrow(arrow: Arrow){
+        this.arrows.delete(arrow.Id.toString());
+        if(this.arrows.size === 0){
+            console.warn("No More Arrows, You Win!");
+            window.alert("No More Arrows, You Win!");
+        }
+    }
+    public AddArrow(arrow: Arrow){
+        this.arrows.set(arrow.Id.toString(), arrow);
+    }
     public get Grid(){
         return this.grid;
     }
     constructor(){
-        for (let w = 0; w < width; w++) {
+        for (let w = 0; w < props.width; w++) {
             let row = [];
-            for (let h = 0; h < height; h++) {
+            for (let h = 0; h < props.height; h++) {
                 row.push( new Cell([w,h], null));
             }
             this.grid.push(row);
@@ -27,62 +57,12 @@ class GridPath{
     public GetAllCells(): Cell[]{
         return this.grid.flat();
     }
-    // public getRandomEmptyCell (){
-    //     const freeCells = this.grid.flat().filter(cell => cell.Arrow === null);
-    //     if(freeCells.length === 0){
-    //         return null;
-    //     }
-    //     const cell = freeCells[Math.floor(Rand() * freeCells.length)];
-    //     const direction = Math.floor(Rand() * 4);
-    //     switch (direction) {
-    //         case Direction.LEFT:{
-    //             const row = this.grid[cell.Id[0]];
-    //             for (let i = 0; i < row.length; i++) {
-    //                 if(row[i].Arrow === null){
-    //                     return row[i];
-    //                 }
-    //             }
-    //             break;
-    //         }
-    //         case Direction.RIGHT:{
-    //             const row = this.grid[cell.Id[0]];
-    //             for (let i = row.length-1; i >= 0; i--) {
-    //                 if(row[i].Arrow === null){
-    //                     return row[i];
-    //                 }
-    //             }
-    //             break;
-    //         }
-    //         case Direction.UP:
-    //             for (let i = 0; i < this.grid.length; i++) {
-    //                 if(this.grid[i][cell.Id[1]].Arrow === null){
-    //                     return this.grid[i][cell.Id[1]];
-    //                 }
-    //             }
-    //             break;
-    //         case Direction.DOWN:
-    //             for (let i = this.grid.length-1; i >= 0; i--) {
-    //                 if(this.grid[i][cell.Id[1]].Arrow === null){
-    //                     return this.grid[i][cell.Id[1]];
-    //                 }
-    //             }
-    //             break;
-    //         default:
-    //             break;
-    //     }
-    //     return null;
-    // }
-    // public getRandomEmptyCellEdge(){
-    //     let edgeCells = [...this.grid[0],...this.grid[this.grid.length-1],...this.grid.map(row => row[0]),...this.grid.map(row => row[row.length-1])];
-    //     edgeCells = edgeCells.filter(cell => cell.Arrow == null);
-    //     // console.log(edgeCells);
-    //     return edgeCells[Math.floor(Rand() * edgeCells.length)];
-    // }
+   
     private getNextEmptyCell(prev:Cell,direction: Direction|null,randomness: number = 0.95): {direction: Direction, cell: Cell} | null {
         if(direction == null){
             direction = Math.floor(Rand() * 4);
         } else {
-            direction =Rand()>1-randomness? Math.floor(Rand() * 4) : direction;
+            direction =Rand()>randomness? Math.floor(Rand() * 4) : direction;
         }
         let failedCounter = 0;
         let x = prev.Id[0];
@@ -124,16 +104,16 @@ class GridPath{
     }
     public getPeremeterCells(index: number): Cell[]{
         let perimeterCells =[...this.grid.flat().filter(cell=>{
-            if(cell.Id[0] === index && cell.Id[1] >= index && cell.Id[1] < height- index){
+            if(cell.Id[0] === index && cell.Id[1] >= index && cell.Id[1] < props.height- index){
                 return true;
             }
-            if(cell.Id[0] === width- index-1 && cell.Id[1] >= index && cell.Id[1] < height- index){
+            if(cell.Id[0] === props.width- index-1 && cell.Id[1] >= index && cell.Id[1] < props.height- index){
                 return true;
             }
-            if(cell.Id[1] === index && cell.Id[0] >= index && cell.Id[0] < width- index){
+            if(cell.Id[1] === index && cell.Id[0] >= index && cell.Id[0] < props.width- index){
                 return true;
             }
-            if(cell.Id[1] === height- index-1 && cell.Id[0] >= index && cell.Id[0] < width- index){
+            if(cell.Id[1] === props.height- index-1 && cell.Id[0] >= index && cell.Id[0] < props.width- index){
                 return true;
             }
             return false;
@@ -148,7 +128,7 @@ class GridPath{
     GenerateArrow(start: Cell, length: number,rank: number): Arrow|null{
         // cannot point to an arrow head in the opposite direction (looking at each other)
         // cannot point to its own body
-        let next = this.getNextEmptyCell(start,null,1);
+        let next = this.getNextEmptyCell(start,null,props.straightness);
         if(next == null){
             return null;
         }
@@ -159,6 +139,12 @@ class GridPath{
             let collidingArrow = ray.find(cell=>cell.Arrow && cell.Arrow.Direction == (arrow.Direction+2)%4 && cell.Arrow.TailCell[0] == cell.Id[0] && cell.Arrow.TailCell[1] == cell.Id[1]);
             if(collidingArrow){
                 console.log("collidingArrow", collidingArrow.Id);
+                return null;
+            }
+            // find if arrow points at higher rank or same rank arrow
+            let higherRankArrow = ray.find(cell=>cell.Arrow && cell.Arrow.Rank >= arrow.Rank);
+            if(higherRankArrow){
+                console.log("higherRankArrow", higherRankArrow.Id);
                 return null;
             }
         }
@@ -182,7 +168,7 @@ class GridPath{
         next.cell.Arrow = arrow;
         start.Arrow = arrow;
         for (let i = 2; i < length; i++) {
-            next = this.getNextEmptyCell(next.cell,next.direction,Math.floor(Rand()*10)/10);
+            next = this.getNextEmptyCell(next.cell,next.direction,props.straightness);
             if(next == null || ray.includes(next.cell)){
                 break;
             }
@@ -204,6 +190,7 @@ class GridPath{
             let cell = this.grid[path[i][0]][path[i][1]];
             cell.Arrow = null;
         }
+        
     }
     public IsArrowClearToExit(arrow: Arrow):boolean{
         // check if there are no filled cells in fornt of the arrow
@@ -212,7 +199,7 @@ class GridPath{
         console.log("IsArrowClearToExit", path, Direction[direction]);
         switch(direction){
             case Direction.UP:
-                for(let i = 1; i < height-path[0][1]; i++){
+                for(let i = 1; i < props.height-path[0][1]; i++){
                     if(this.grid[path[i][0]][path[i][1]].Arrow != null){
                         return false;
                     }
@@ -259,13 +246,13 @@ class GridPath{
                 return cells;
             case Direction.RIGHT:
                 x++;
-                for(let i = x; i < width; i++){
+                for(let i = x; i < props.width; i++){
                     cells.push(this.grid[i][y]);
                 }
                 return cells;
             case Direction.DOWN:
                 y++;
-                for(let i = y; i < height; i++){
+                for(let i = y; i < props.height; i++){
                     cells.push(this.grid[x][i]);
                 }
                 return cells;
@@ -293,6 +280,8 @@ class Arrow{
     private rank: number;
     private arrowElement: SVGPathElement|null = null;
     private collisionElement: SVGPathElement|null = null;
+    private animationStartTime: number = 0;
+    private animationSpeed = 150;
     constructor(id: [number, number],direction: Direction, rank: number){
         this.id = id;
         this.direction = direction;
@@ -334,9 +323,9 @@ class Arrow{
         const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
         arrow.setAttribute("d", d);
         arrow.classList.add("arrowElement");
-        let rot =  (320/maxRank)*(this.rank+2);
+        let rot =  ((360*5)/props.maxRank)*(this.rank+2);
         arrow.style.filter = `hue-rotate(${rot}deg)`;
-        arrow.style.strokeWidth = scale/5+'';
+        arrow.style.strokeWidth = props.scale/5+'';
         // arrow.addEventListener("click", () => {
         //     console.log("click", this,arrow);
         //     this.arrowElement?.remove();
@@ -357,6 +346,8 @@ class Arrow{
     }
     ClearToExit(){
         let ray = gridPath.getArrowHeadRay(this);
+        // this.AnimateArrowExit(ray);
+        // return;
         console.log(ray.map(cell=>cell.Arrow == null));
         let blocked = ray.some(cell=>cell.Arrow !== null);
         console.log("blocked", blocked);
@@ -372,11 +363,12 @@ class Arrow{
             this.collisionElement = null;
             gridPath.RemoveArrow(this);
             this.AnimateArrowExit(ray);
+            gridPath.DeleteArrow(this);
         }
         return;
         
     }
-    AnimateArrowExit(ray: Cell[]){
+    AnimateArrowExit_old(ray: Cell[]){
         if(ray.length === 0){
             animationEnded(this.direction,this);
             return;
@@ -395,14 +387,15 @@ class Arrow{
             this.path.shift();
             this.path.push(lastCell.Id);
             // newPath.unshift(lastCell.Id);
-            let d = this.stringifyBreakPointsToPath(this.path);
+            let newD = this.stringifyBreakPointsToPath(this.path);
+            let d = newD;
             this.arrowElement?.setAttribute("d", d);
             if(ray.length === 0){
                 clearInterval(interval);
                 animationEnded(this.direction,this);
                 return;
             }
-        }, 50);
+        }, 500);
         function animationEnded(dir:Direction,arrow:Arrow){
             let counter = 0;
             let interval = setInterval(() => {
@@ -441,6 +434,95 @@ class Arrow{
         }
         
     }
+    AnimateArrowExit(ray: Cell[]){
+        ray.reverse();
+        this.AnimateArrowExitSection(ray);
+    }
+    AnimateArrowExitSection(ray: Cell[]){
+        if(ray.length === 0) {
+            this.AnimateArrowExitOutofview();
+            return;
+        }
+        console.log("AnimateArrowExitSection", ray);
+        let lastCell = ray.pop();
+        if(!lastCell) return;
+        const newPath = [...this.path];
+        newPath.shift();
+        newPath.push(lastCell.Id);
+        // this.arrowElement?.setAttribute('d', this.stringifyBreakPointsToPath(newPath));
+        // return;
+        this.arrowElement?.setAttribute('data-animate-to', JSON.stringify(newPath));
+        this.arrowElement?.setAttribute('data-animate-from', JSON.stringify(this.path));
+        this.animationStartTime = performance.now();
+        this.animationSpeed = Math.max(this.animationSpeed * 0.8, 30);
+        
+        this.animate(this,ray);
+        
+    }
+    exitCounter=0;
+    AnimateArrowExitOutofview(){
+        this.exitCounter++;
+        if(this.exitCounter > 100) {
+            this.arrowElement?.remove();
+            this.arrowElement = null;
+            console.warn("AnimateArrowExitOutofview Arrow Removed", this);
+            
+            return;
+        }
+
+        let lastCell = this.path[this.path.length-1];
+        lastCell = [...lastCell];
+        switch(this.direction){
+            case Direction.UP:
+                lastCell[1]+=1;
+                break;
+            case Direction.LEFT:
+                lastCell[0]+=1;
+                break;
+            case Direction.DOWN:
+                lastCell[1]-=1;
+                break;
+            case Direction.RIGHT:
+                lastCell[0]-=1;
+                break;
+        }
+        const newPath = [...this.path];
+        newPath.shift();
+        newPath.push(lastCell);
+        // this.arrowElement?.setAttribute('d', this.stringifyBreakPointsToPath(newPath));
+        // return;
+        this.arrowElement?.setAttribute('data-animate-to', JSON.stringify(newPath));
+        this.arrowElement?.setAttribute('data-animate-from', JSON.stringify(this.path));
+        this.animationStartTime = performance.now();
+        this.animationSpeed = Math.max(this.animationSpeed * 0.8, 10);
+        
+        this.animate(this,[]);
+    }
+    animate(arrow: Arrow,ray: Cell[]){
+        return requestAnimationFrame(() => {
+            let timePassed = performance.now() - arrow.animationStartTime;
+            let progress = timePassed / arrow.animationSpeed;
+            let from = JSON.parse(arrow.arrowElement?.getAttribute('data-animate-from') ?? '[]');
+            let to = JSON.parse(arrow.arrowElement?.getAttribute('data-animate-to') ?? '[]');
+            let fc = 0;
+            let lc = from.length-1;
+            
+            from[fc][0] = from[fc][0] + (to[fc][0] - from[fc][0]) * progress;
+            from[fc][1] = from[fc][1] + (to[fc][1] - from[fc][1]) * progress;
+            
+            from[lc][0] = from[lc][0] + (to[lc][0] - from[lc][0]) * progress;
+            from[lc][1] = from[lc][1] + (to[lc][1] - from[lc][1]) * progress;
+            
+            arrow.arrowElement?.setAttribute('d', arrow.stringifyBreakPointsToPath(from));
+            console.log("animate", progress);
+            if(progress < 1){
+                arrow.animate(arrow,ray);
+            } else {
+                arrow.path = to;
+                arrow.AnimateArrowExitSection(ray);
+            }
+        });
+    }
 
     
 
@@ -457,15 +539,15 @@ class Arrow{
         }
         let d = "";
         for (let i = 0; i < breakPoints.length; i++) {
-            maxX = Math.max(maxX, breakPoints[i][0] + offset + 1);
-            maxY = Math.max(maxY, breakPoints[i][1] + offset + 1);
+            maxX = Math.max(maxX, breakPoints[i][0] + props.offset + 1);
+            maxY = Math.max(maxY, breakPoints[i][1] + props.offset + 1);
         }
-        let points = breakPoints.map((bp: number[]) => ([(bp[0] + offset) * scale + (Rand() * jiggle - jiggle / 2), (bp[1] + offset) * scale + (Rand() * jiggle - jiggle / 2)]));
+        let points = breakPoints.map((bp: number[]) => ([(bp[0] + props.offset) * props.scale + (Rand() * props.jiggle - props.jiggle / 2), (bp[1] + props.offset) * props.scale + (Rand() * props.jiggle - props.jiggle / 2)]));
         let expPoints = [points[0]];
         for (let i = 1; i < points.length - 1; i++) {
             let dist1 = distance(points[i - 1], points[i]);
             let dist2 = distance(points[i], points[i + 1]);
-            let minRad = Math.min(dist1 / 2, dist2 / 2, radius);
+            let minRad = Math.min(dist1 / 2, dist2 / 2, props.radius);
             let p1 = pointFromDistance(points[i - 1], points[i], dist1 - minRad);
             let p2 = pointFromDistance(points[i], points[i + 1], minRad);
             expPoints.push(p1, points[i], p2);
