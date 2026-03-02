@@ -75,14 +75,14 @@ async function clear() {
 let root = document.createElementNS("http://www.w3.org/2000/svg", "g");
 function draw() {
     svg?.appendChild(root);
-    console.log("Grid", JSON.parse(JSON.stringify(gridPath.Grid)));
-    console.log("draw");
+    // console.log("Grid",JSON.parse(JSON.stringify(gridPath.Grid)));
+    // console.log("draw");
     for (let i = 0; i < props.maxRank; i++) {
         let cells = gridPath.getPeremeterCells(i);
         cells = cells.sort((a, b) => Rand() - 0.5);
-        console.log(`get Peremeter Cells ${i}`, JSON.parse(JSON.stringify(cells)));
+        // console.log(`get Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
         cells = cells.filter(cell => cell.Arrow == null);
-        console.log(`get Empty Peremeter Cells ${i}`, JSON.parse(JSON.stringify(cells)));
+        // console.log(`get Empty Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
         for (let cell of cells) {
             if (cell.Arrow != null)
                 continue;
@@ -100,9 +100,9 @@ function draw() {
     for (let i = 0; i < props.maxRank; i++) {
         let cells = gridPath.getPeremeterCells(i);
         cells = cells.sort((a, b) => Rand() - 0.5);
-        console.log(`get Peremeter Cells ${i}`, JSON.parse(JSON.stringify(cells)));
+        // console.log(`get Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
         cells = cells.filter(cell => cell.Arrow == null);
-        console.log(`get Empty Peremeter Cells ${i}`, JSON.parse(JSON.stringify(cells)));
+        // console.log(`get Empty Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
         for (let cell of cells) {
             if (cell.Arrow != null)
                 continue;
@@ -165,9 +165,88 @@ function restart() {
     root?.remove();
     root = document.createElementNS("http://www.w3.org/2000/svg", "g");
     gridPath = new GridPath();
-    if (svg) {
-        svg.style.width = `${props.width * props.scale + 100}px`;
-        svg.style.height = `${props.height * props.scale + 100}px`;
-    }
     draw();
 }
+let dragging = false;
+let dragX = 0;
+let dragY = 0;
+window.addEventListener("mousemove", (e) => {
+    // console.log(e.buttons, dragging);
+    if (e.buttons !== 1) {
+        if (dragging) {
+            let tX = svg.dataTX ?? 0;
+            let tY = svg.dataTY ?? 0;
+            svg.dataTX = tX + e.clientX - dragX;
+            svg.dataTY = tY + e.clientY - dragY;
+            dragX = e.clientX;
+            dragY = e.clientY;
+        }
+        dragging = false;
+        return;
+    }
+    if (!dragging) {
+        dragging = true;
+        dragX = e.clientX;
+        dragY = e.clientY;
+        return;
+    }
+    if (dragging) {
+        let tX = svg.dataTX ?? 0;
+        let tY = svg.dataTY ?? 0;
+        tX = tX + e.clientX - dragX;
+        tY = tY + e.clientY - dragY;
+        // svg?.setAttribute("transform", `translate(${tX}px,${tY}px)`);
+        if (!svg)
+            return;
+        root.style.transform = `translate(${tX}px,${tY}px)`;
+    }
+}, {
+    capture: true,
+    passive: true
+});
+let mouseUpBlocked = false;
+window.addEventListener("mouseup", (ev) => {
+    if (dragging) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        let tX = svg.dataTX ?? 0;
+        let tY = svg.dataTY ?? 0;
+        svg.dataTX = tX + ev.clientX - dragX;
+        svg.dataTY = tY + ev.clientY - dragY;
+        dragX = ev.clientX;
+        dragY = ev.clientY;
+        mouseUpBlocked = (Math.abs(svg.dataTX) > 3) || (Math.abs(svg.dataTY) > 3);
+    }
+    dragging = false;
+});
+// iframe.contentWindow.postMessage({type: "click", x: x, y: y}, "*");
+window.addEventListener("message", (event) => {
+    console.log(event);
+    switch (event.data.type) {
+        case "click":
+            window.dispatchEvent(new MouseEvent("click", {
+                clientX: event.data.x,
+                clientY: event.data.y,
+                buttons: 1,
+            }));
+            break;
+        case "mousemove":
+            window.dispatchEvent(new MouseEvent("mousemove", {
+                clientX: event.data.x,
+                clientY: event.data.y,
+            }));
+            break;
+        case "mouseup":
+            window.dispatchEvent(new MouseEvent("mouseup", {
+                clientX: event.data.x,
+                clientY: event.data.y,
+            }));
+            break;
+        case "mousedown":
+            window.dispatchEvent(new MouseEvent("mousedown", {
+                clientX: event.data.x,
+                clientY: event.data.y,
+            }));
+            break;
+    }
+});

@@ -126,13 +126,13 @@ class GridPath {
         {
             let collidingArrow = ray.find(cell => cell.Arrow && cell.Arrow.Direction == (arrow.Direction + 2) % 4 && cell.Arrow.TailCell[0] == cell.Id[0] && cell.Arrow.TailCell[1] == cell.Id[1]);
             if (collidingArrow) {
-                console.log("collidingArrow", collidingArrow.Id);
+                // console.log("collidingArrow", collidingArrow.Id);
                 return null;
             }
             // find if arrow points at higher rank or same rank arrow
             let higherRankArrow = ray.find(cell => cell.Arrow && cell.Arrow.Rank >= arrow.Rank);
             if (higherRankArrow) {
-                console.log("higherRankArrow", higherRankArrow.Id);
+                // console.log("higherRankArrow", higherRankArrow.Id);
                 return null;
             }
         }
@@ -185,7 +185,7 @@ class GridPath {
         // check if there are no filled cells in fornt of the arrow
         let path = arrow.Path;
         let direction = arrow.Direction;
-        console.log("IsArrowClearToExit", path, Direction[direction]);
+        // console.log("IsArrowClearToExit", path, Direction[direction]);
         switch (direction) {
             case Direction.UP:
                 for (let i = 1; i < props.height - path[0][1]; i++) {
@@ -223,7 +223,7 @@ class GridPath {
         let x = arrow.TailCell[0];
         let y = arrow.TailCell[1];
         let cells = [];
-        console.log("getArrowHeadRay", Direction[direction]);
+        // console.log("getArrowHeadRay", Direction[direction]);
         switch (direction) {
             case Direction.UP:
                 y--;
@@ -310,8 +310,8 @@ class Arrow {
         const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
         arrow.setAttribute("d", d);
         arrow.classList.add("arrowElement");
-        let rot = ((360 * 5) / props.maxRank) * (this.rank + 2);
-        arrow.style.filter = `hue-rotate(${rot}deg)`;
+        let rot = (200 / props.maxRank) * (this.rank);
+        arrow.style.filter = `hue-rotate(${rot + 50}deg)`;
         arrow.style.strokeWidth = props.scale / 5 + '';
         // arrow.addEventListener("click", () => {
         //     console.log("click", this,arrow);
@@ -326,6 +326,10 @@ class Arrow {
         collisionElement.setAttribute("d", d);
         collisionElement.classList.add("collisionElement");
         collisionElement.addEventListener("click", () => {
+            if (mouseUpBlocked) {
+                mouseUpBlocked = false;
+                return;
+            }
             this.ClearToExit();
         });
         this.collisionElement = collisionElement;
@@ -335,16 +339,16 @@ class Arrow {
         let ray = gridPath.getArrowHeadRay(this);
         // this.AnimateArrowExit(ray);
         // return;
-        console.log(ray.map(cell => cell.Arrow == null));
+        // console.log(ray.map(cell=>cell.Arrow == null));
         let blocked = ray.some(cell => cell.Arrow !== null);
-        console.log("blocked", blocked);
+        // console.log("blocked", blocked);
         if (blocked) {
             this.arrowElement?.classList.add("collided");
             return;
         }
         else {
             this.arrowElement?.classList.remove("collided");
-            console.log("click", this, this.arrowElement, this.collisionElement);
+            // console.log("click", this, this.arrowElement, this.collisionElement);
             // this.arrowElement?.remove();
             // this.arrowElement = null;
             this.collisionElement?.remove();
@@ -426,7 +430,7 @@ class Arrow {
             this.AnimateArrowExitOutofview();
             return;
         }
-        console.log("AnimateArrowExitSection", ray);
+        // console.log("AnimateArrowExitSection", ray);
         let lastCell = ray.pop();
         if (!lastCell)
             return;
@@ -447,7 +451,7 @@ class Arrow {
         if (this.exitCounter > 100) {
             this.arrowElement?.remove();
             this.arrowElement = null;
-            console.warn("AnimateArrowExitOutofview Arrow Removed", this);
+            // console.warn("AnimateArrowExitOutofview Arrow Removed", this);
             return;
         }
         let lastCell = this.path[this.path.length - 1];
@@ -490,7 +494,7 @@ class Arrow {
             from[lc][0] = from[lc][0] + (to[lc][0] - from[lc][0]) * progress;
             from[lc][1] = from[lc][1] + (to[lc][1] - from[lc][1]) * progress;
             arrow.arrowElement?.setAttribute('d', arrow.stringifyBreakPointsToPath(from));
-            console.log("animate", progress);
+            // console.log("animate", progress);
             if (progress < 1) {
                 arrow.animate(arrow, ray);
             }
