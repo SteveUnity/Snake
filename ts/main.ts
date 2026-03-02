@@ -177,36 +177,52 @@ function restart(){
 let dragging = false;
 let dragX = 0;
 let dragY = 0;
-window.addEventListener("mousemove",(e)=>{
+const mouseMoveEvent = (clientX: number, clientY: number, buttons: number) => {
     // console.log(e.buttons, dragging);
-    if(e.buttons !== 1){
+    if(buttons !== 1){
         if(dragging){
             let tX = (svg as any).dataTX ?? 0;
             let tY = (svg as any).dataTY ?? 0;
-            (svg as any).dataTX = tX + e.clientX - dragX;
-            (svg as any).dataTY = tY + e.clientY - dragY;
-            dragX = e.clientX;
-            dragY = e.clientY;
-
+            (svg as any).dataTX = tX + clientX - dragX;
+            (svg as any).dataTY = tY + clientY - dragY;
+            dragX = clientX;
+            dragY = clientY;
+    
         }
         dragging = false;
         return;
     }
     if(!dragging){
         dragging = true;
-        dragX = e.clientX;
-        dragY = e.clientY;
+        dragX = clientX;
+        dragY = clientY;
         return;
     }
     if(dragging){
         let tX = (svg as any).dataTX ?? 0;
         let tY = (svg as any).dataTY ?? 0;
-        tX = tX + e.clientX - dragX;
-        tY = tY + e.clientY - dragY;
+        tX = tX + clientX - dragX;
+        tY = tY + clientY - dragY;
         // svg?.setAttribute("transform", `translate(${tX}px,${tY}px)`);
         if(!svg) return;
         root.style.transform = `translate(${tX}px,${tY}px)`;
     }
+}
+const mouseUpEvent = (clientX: number, clientY: number) => {
+    if(dragging){
+        
+        let tX = (svg as any).dataTX ?? 0;
+        let tY = (svg as any).dataTY ?? 0;
+        (svg as any).dataTX = tX + clientX - dragX;
+        (svg as any).dataTY = tY + clientY - dragY;
+        dragX = clientX;
+        dragY = clientY;
+        mouseUpBlocked = (Math.abs((svg as any).dataTX) > 3) || (Math.abs((svg as any).dataTY) > 3);
+    }
+    dragging = false;
+}
+window.addEventListener("mousemove",(ev)=>{
+    mouseMoveEvent(ev.clientX, ev.clientY, ev.buttons);
 }, {
     capture: true,
     passive: true
@@ -214,18 +230,10 @@ window.addEventListener("mousemove",(e)=>{
 let mouseUpBlocked = false;
 window.addEventListener("mouseup",(ev)=>{
     if(dragging){
-        
         ev.preventDefault();
         ev.stopPropagation();
-        let tX = (svg as any).dataTX ?? 0;
-        let tY = (svg as any).dataTY ?? 0;
-        (svg as any).dataTX = tX + ev.clientX - dragX;
-        (svg as any).dataTY = tY + ev.clientY - dragY;
-        dragX = ev.clientX;
-        dragY = ev.clientY;
-        mouseUpBlocked = (Math.abs((svg as any).dataTX) > 3) || (Math.abs((svg as any).dataTY) > 3);
+        mouseUpEvent(ev.clientX, ev.clientY);
     }
-    dragging = false;
 });
 // iframe.contentWindow.postMessage({type: "click", x: x, y: y}, "*");
 
@@ -233,23 +241,24 @@ window.addEventListener("message", (event) => {
     console.log(event);
     switch(event.data.type){
         case "click":
-            window.dispatchEvent(new MouseEvent("click", {
-                clientX: event.data.x,
-                clientY: event.data.y,
-                buttons: 1,
-            }));
+            // window.dispatchEvent(new MouseEvent("click", {
+            //     clientX: event.data.x,
+            //     clientY: event.data.y,
+            //     buttons: 1,
+            // }));
+            (window.document.elementsFromPoint(event.data.x, event.data.y)
+            .find(element=>element.classList.contains("collisionElement")) as HTMLElement)
+            ?.dispatchEvent(new MouseEvent("click", {
+                    clientX: event.data.x,
+                    clientY: event.data.y,
+                    buttons: 1,
+                }));
             break;
         case "mousemove":
-            window.dispatchEvent(new MouseEvent("mousemove", {
-                clientX: event.data.x,
-                clientY: event.data.y,
-            }));
+            mouseMoveEvent(event.data.x, event.data.y, 1);
             break;
         case "mouseup":
-            window.dispatchEvent(new MouseEvent("mouseup", {
-                clientX: event.data.x,
-                clientY: event.data.y,
-            }));
+            mouseUpEvent(event.data.x, event.data.y);
             break;
         case "mousedown":
             window.dispatchEvent(new MouseEvent("mousedown", {
