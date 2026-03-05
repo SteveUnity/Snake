@@ -19,8 +19,8 @@ const props:{
 }`);
 
 props.maxRank = Math.floor(Math.min(props.width, props.height)/2);
-props.scale = 25;
-props.offset = 2;
+props.scale = 40;
+props.offset = 0;
 props.radius = 4;
 (<HTMLInputElement>document.getElementById("level")).value = props.level.toString();
 (<HTMLInputElement>document.getElementById("width")).value = props.width.toString();
@@ -31,6 +31,17 @@ props.radius = 4;
 class GridPath{
     private grid: Array<Array<Cell>> = [];
     private arrows: Map<string, Arrow> = new Map();
+    constructor(){
+        
+        for (let w = 0; w < props.width; w++) {
+            let row = [];
+            for (let h = 0; h < props.height; h++) {
+                row.push( new Cell([w,h], null));
+            }
+            this.grid.push(row);
+            // this.grid.push(new Array(this.height).fill(null));
+        }
+    }
     public DeleteArrow(arrow: Arrow){
         this.arrows.delete(arrow.Id.toString());
         if(this.arrows.size === 0){
@@ -46,21 +57,25 @@ class GridPath{
     public get Grid(){
         return this.grid;
     }
-    constructor(){
-        for (let w = 0; w < props.width; w++) {
-            let row = [];
-            for (let h = 0; h < props.height; h++) {
-                row.push( new Cell([w,h], null));
-            }
-            this.grid.push(row);
-            // this.grid.push(new Array(this.height).fill(null));
-        }
-    }
+    
     public GetAllCells(): Cell[]{
         return this.grid.flat();
     }
-   
-    private getNextEmptyCell(prev:Cell,direction: Direction|null,randomness: number = 0.95): {direction: Direction, cell: Cell} | null {
+    public GetRandomEmptyCell(): Cell|null{
+        let cells = this.grid.flat().filter(cell=>cell.Arrow == null && cell.Rank == 0);
+        if(cells.length === 0){
+            return null;
+        }
+        return cells[Math.floor(Rand() * cells.length)];
+    }
+    public getEmptyCellByRank(rank: number): Cell|null{
+        let cells = this.grid.flat().filter(cell=>cell.Rank == rank && cell.Arrow == null);
+        if(cells.length === 0){
+            return null;
+        }
+        return cells[Math.floor(Rand() * cells.length)];
+    }
+    private getNextEmptyCell(prev:Cell,direction: Direction|null,randomness: number = 0.95,rank: number = 0): {direction: Direction, cell: Cell} | null {
         if(direction == null){
             direction = Math.floor(Rand() * 4);
         } else {
@@ -74,25 +89,25 @@ class GridPath{
             switch (direction) {
                 case Direction.UP:
                     cell = this.grid[x]?.[y-1];
-                    if(cell && cell.Arrow == null){
+                    if(cell && cell.Arrow == null && cell.Rank <= rank){
                         return {direction, cell};
                     }
                     break;
                 case Direction.RIGHT:
                     cell = this.grid[x+1]?.[y];
-                    if(cell && cell.Arrow == null){
+                    if(cell && cell.Arrow == null && cell.Rank <= rank){
                         return {direction, cell};
                     }
                     break;
                 case Direction.DOWN:
                     cell = this.grid[x]?.[y+1];
-                    if(cell && cell.Arrow == null){
+                    if(cell && cell.Arrow == null && cell.Rank <= rank){
                         return {direction, cell};
                     }
                     break;
                 case Direction.LEFT:
                     cell = this.grid[x-1]?.[y];
-                    if(cell && cell.Arrow == null){
+                    if(cell && cell.Arrow == null && cell.Rank <= rank){
                         return {direction, cell};
                     }
                     break;
@@ -139,14 +154,14 @@ class GridPath{
     //     // arrow cannot point to another arrows head
         
     // }
-    GenerateArrow(start: Cell, length: number,rank: number): Arrow|null{
+    GenerateArrow(startCell: Cell, length: number,rank: number): Arrow|null{
         // cannot point to an arrow head in the opposite direction (looking at each other)
         // cannot point to its own body
-        let next = this.getNextEmptyCell(start,null,props.straightness);
-        if(next == null){
+        let nextCell = this.getNextEmptyCell(startCell,null,props.straightness);
+        if(nextCell == null){
             return null;
         }
-        let arrow = new Arrow(start.Id, next.direction,rank);
+        let arrow = new Arrow(startCell.Id, nextCell.direction,rank);
         // check if the arrow points to an arrow head in the opposite direction (looking at each other)
         let ray = this.getArrowHeadRay(arrow);
         {
@@ -157,39 +172,44 @@ class GridPath{
             }
             collidingArrow = ray.find(cell=>cell.Arrow );
             // find if arrow points at higher rank or same rank arrow
-            let higherRankArrow = ray.find(cell=>cell.Arrow && cell.Arrow.Rank <= arrow.Rank);
-            if(higherRankArrow){
-                // console.log("higherRankArrow", higherRankArrow.Id);
-                return null;
-                arrow.Color = "#0f0";
+            
+            // ray.forEach(cell=>cell.Rank = arrow.Rank+1);
+            for(let cell of ray){
+                if(cell.Rank>0 && cell.Rank<=arrow.Rank && cell.Arrow !== null){
+                    console.error("collidingArrow lower rank", cell, arrow, rank);
+                    return null;
+                }
             }
         }
+        // arrow is valid
+        if(startCell.Rank == 0){
+            startCell.Rank = arrow.Rank;
+        }
+        if(nextCell.cell.Rank == 0){
+            nextCell.cell.Rank = arrow.Rank;
+        }
+        arrow.AddPoint(nextCell.cell.Id);
+        nextCell.cell.Arrow = arrow;
+        startCell.Arrow = arrow;
+        // mark all empty ray cells as ranking one higher than the arrow
+        ray.forEach(cell=>{
+            if(cell.Rank == 0){
+                cell.Rank = arrow.Rank+1;
+            }else if(cell.Rank<=arrow.Rank){
+                if(cell.Arrow == null) cell.Rank = arrow.Rank+1;
+                else return null;
+                // cell.invalidate();
+            }
 
-        {
-            let x = 0;
-            let y = 0;
-            switch(next.direction){
-                case Direction.UP:
-                    // x = arrow
-                    break;
-                case Direction.RIGHT:
-                    break;
-                case Direction.DOWN:
-                    break;
-                case Direction.LEFT:
-                    break;
-            }
-        }
-        arrow.AddPoint(next.cell.Id);
-        next.cell.Arrow = arrow;
-        start.Arrow = arrow;
+        });
         for (let i = 2; i < length; i++) {
-            next = this.getNextEmptyCell(next.cell,next.direction,props.straightness);
-            if(next == null || ray.includes(next.cell)){
+            nextCell = this.getNextEmptyCell(nextCell.cell,nextCell.direction,props.straightness,arrow.Rank);
+            if(nextCell == null || ray.includes(nextCell.cell)){
                 break;
             }
-            arrow.AddPoint(next.cell.Id);
-            next.cell.Arrow = arrow;
+            arrow.AddPoint(nextCell.cell.Id);
+            nextCell.cell.Arrow = arrow;
+            nextCell.cell.Rank = arrow.Rank;
         }
         return arrow;
     }
@@ -208,45 +228,7 @@ class GridPath{
         }
         
     }
-    public IsArrowClearToExit(arrow: Arrow):boolean{
-        // check if there are no filled cells in fornt of the arrow
-        let path = arrow.Path;
-        let direction = arrow.Direction;
-        // console.log("IsArrowClearToExit", path, Direction[direction]);
-        switch(direction){
-            case Direction.UP:
-                for(let i = 1; i < props.height-path[0][1]; i++){
-                    if(this.grid[path[i][0]][path[i][1]].Arrow != null){
-                        return false;
-                    }
-                }
-                
-                break;
-            case Direction.RIGHT:
-                for(let i = 1; i < path.length; i++){
-                    if(this.grid[path[i][0]][path[i][1]].Arrow != null){
-                        return false;
-                    }
-                }
-                break;
-            case Direction.DOWN:
-                for(let i = 1; i < path.length; i++){
-                    if(this.grid[path[i][0]][path[i][1]].Arrow != null){
-                        return false;
-                    }
-                }
-                break;
-            case Direction.LEFT:
-                
-                for(let i = 1; i < path.length; i++){
-                    if(this.grid[path[i][0]][path[i][1]].Arrow != null){
-                        return false;
-                    }
-                }
-                break;
-        }
-        return true;
-    }
+
     public getArrowHeadRay(arrow: Arrow):Cell[]{
         let direction = (arrow.Direction+2)%4;
         let x = arrow.TailCell[0];
@@ -280,6 +262,61 @@ class GridPath{
                 return cells;
         }
         return [];
+    }
+    public Hint(): Arrow|null{
+        // get an arrow that is clear to exit
+        let arrows = this.arrows.values();
+        for(let arrow of arrows){
+            if(!arrow.IsBlocked()){
+                return arrow;
+            }
+        }
+        return null;
+    }
+    ValidateLevel(): boolean{
+        let grid: boolean[][] = [];
+        for (let x = 0; x < this.grid.length; x++) {
+            let row = [];
+            for (let y = 0; y < this.grid[x].length; y++) {
+                row.push(this.grid[x][y].Arrow !== null);
+            }
+            grid.push(row);
+        }
+        let arrows = [...this.arrows.values()];
+        let counter = 0;
+        while(counter<arrows.length ){
+            let arrow = arrows[counter];
+            if (validateArrowExit(arrow, grid)){
+                arrows.splice(counter, 1);
+                counter = 0;
+                arrow.Color = "orangered";
+                arrow.GetPoints().forEach(point=>{
+                    grid[point[0]][point[1]] = false;
+                });
+                continue;
+            }
+            counter++;
+        }
+        if(arrows.length > 0){
+            for (let x = 0; x < this.grid.length; x++) {
+                for (let y = 0; y < this.grid[x].length; y++) {
+                    if(grid[x][y]){
+                        this.grid[x][y].fillColor("#660000");
+                    }
+                }
+            }
+        }
+        return arrows.length === 0;
+
+        function validateArrowExit(arrow: Arrow, grid: boolean[][]): boolean{
+            let ray = gridPath.getArrowHeadRay(arrow);
+            for (const cell of ray) {
+                if(grid[cell.Id[0]][cell.Id[1]]){
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 }
 enum Direction{
@@ -352,8 +389,8 @@ class Arrow{
             colors.push(`rgb(${Math.round(i/props.maxRank*255)},${Math.round(i/props.maxRank*255)},255)`);
         }
 
-        const color=this.color==""?colors[this.rank]:this.color;
-        arrow.style.stroke = color;
+        const color=this.color==""?"#aaa":this.color;
+        // arrow.style.stroke = color;
         arrow.style.strokeWidth = props.scale/5+'';
         // arrow.addEventListener("click", () => {
         //     console.log("click", this,arrow);
@@ -367,6 +404,7 @@ class Arrow{
         let collisionElement = document.createElementNS("http://www.w3.org/2000/svg", "path");
         collisionElement.setAttribute("d", d);
         collisionElement.classList.add("collisionElement");
+        collisionElement.style.strokeWidth = props.scale*1.1+'px';
         collisionElement.addEventListener("click", () => {
             if(mouseUpBlocked) {
                 mouseUpBlocked = false;
@@ -374,24 +412,32 @@ class Arrow{
             }
             this.ClearToExit();
         });
+        collisionElement.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            validateRay(this);
+        });
         this.collisionElement = collisionElement;
         return [arrow,collisionElement];
     }
+    RemoveForValidation(): void{
+        this.collisionElement?.remove();
+        this.collisionElement = null;
+        gridPath.RemoveArrow(this);
+        gridPath.DeleteArrow(this);
+    }
+    IsBlocked(ray?: Cell[]): boolean{
+        if(!ray) ray = gridPath.getArrowHeadRay(this);
+        let blocked = ray.some(cell=>cell.Arrow !== null);
+        return blocked;
+    }
     ClearToExit(){
         let ray = gridPath.getArrowHeadRay(this);
-        // this.AnimateArrowExit(ray);
-        // return;
-        // console.log(ray.map(cell=>cell.Arrow == null));
-        let blocked = ray.some(cell=>cell.Arrow !== null);
-        // console.log("blocked", blocked);
+        let blocked = this.IsBlocked(ray);
         if(blocked){
             this.arrowElement?.classList.add("collided");
             return;
         } else {
             this.arrowElement?.classList.remove("collided");
-            // console.log("click", this, this.arrowElement, this.collisionElement);
-            // this.arrowElement?.remove();
-            // this.arrowElement = null;
             this.collisionElement?.remove();
             this.collisionElement = null;
             gridPath.RemoveArrow(this);
@@ -571,9 +617,10 @@ class Arrow{
             return [Math.round(a[0] + dx * dist / d), Math.round(a[1] + dy * dist / d)];
         }
         let d = "";
-        for (let i = 0; i < breakPoints.length; i++) {
-            maxX = Math.max(maxX, breakPoints[i][0] + props.offset + 1);
-            maxY = Math.max(maxY, breakPoints[i][1] + props.offset + 1);
+        breakPoints = JSON.parse(JSON.stringify(breakPoints));
+        for (const element of breakPoints) {
+            element[0] = element[0] + 0.5;
+            element[1] = element[1] + 0.5;
         }
         let points = breakPoints.map((bp: number[]) => ([(bp[0] + props.offset) * props.scale + (Rand() * props.jiggle - props.jiggle / 2), (bp[1] + props.offset) * props.scale + (Rand() * props.jiggle - props.jiggle / 2)]));
         let expPoints = [points[0]];
@@ -604,10 +651,24 @@ class Cell {
     private id: [number, number];
     private idstr: string;
     private arrow: Arrow | null;
+    private rank: number = 0;
+    
+
+    element: SVGGElement | null = null;
+    squareElement: SVGRectElement | null = null;
+    textElement: SVGTextElement | null = null;
     constructor(id: [number, number], arrow: Arrow | null){
         this.id = id;
         this.idstr = `${id[0]},${id[1]}`;
         this.arrow = arrow;
+        this.Element;
+    }
+    public get Rank(): number{
+        return this.rank;
+    }
+    public set Rank(rank: number){
+        this.rank = rank;
+        this.TextElement;
     }
     get Id(){
         return this.id;
@@ -617,6 +678,54 @@ class Cell {
     }
     set Arrow(arrow: Arrow | null){
         this.arrow = arrow;
+    }
+    private get Element(): SVGGElement{
+        if(this.element) {
+            return this.element;
+        }
+        let element = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        element.classList.add("cell");
+        element.setAttribute("data-id", this.idstr);
+        element.style.transform = `translate(${this.id[0] * props.scale}px,${this.id[1] * props.scale}px)`;
+        this.element = element;
+        let rect = this.squareElement = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", "0");
+        rect.setAttribute("y", "0");
+        rect.setAttribute("width", props.scale.toString());
+        rect.setAttribute("height", props.scale.toString());
+        rect.setAttribute("fill", "none");
+        rect.setAttribute("stroke", "grey");
+        rect.setAttribute("stroke-width", "1");
+        element.appendChild(rect);
+        element.appendChild(this.TextElement);
+
+        if(gridGroup) gridGroup.appendChild(element);
+        return element;
+    }
+    private get TextElement(): SVGTextElement{
+        if(this.textElement){
+            this.textElement.textContent = this.Rank == 0?"":this.Rank.toString();
+            this.textElement.setAttribute("fill", `rgb(${Math.round(this.Rank/props.maxRank*255)},${Math.round(this.Rank/props.maxRank*255)},255)`);
+            return this.textElement;
+        }
+        this.textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        this.textElement.setAttribute("x", "0");
+        this.textElement.setAttribute("y", "0");
+        this.textElement.setAttribute("text-anchor", "middle");
+        this.textElement.setAttribute("dominant-baseline", "middle");
+        this.textElement.setAttribute("font-size", props.scale/2+'');
+        this.textElement.setAttribute("fill", `rgb(${Math.round(this.Rank/props.maxRank*255)},${Math.round(this.Rank/props.maxRank*255)},255)`);
+        this.textElement.style.transform = `translate(${props.scale/2}px,${props.scale/2}px)`;
+        this.textElement.textContent = this.Rank == 0?"":this.Rank.toString();
+        return this.textElement;
+    }
+    invalidate(){
+        this.Rank = 0;
+        this.TextElement;
+        this.squareElement?.setAttribute("fill", "red");
+    }
+    fillColor(color: string){
+        this.squareElement?.setAttribute("fill", color);
     }
 }
 // var gridPath = new GridPath();

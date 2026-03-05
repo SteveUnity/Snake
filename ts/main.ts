@@ -28,141 +28,131 @@ function Rand(){
 //         height = innerHeight;
 //     console.log({width, height,innerWidth:window.innerWidth,innerHeight:window.innerHeight});
 // }
-let gridPath = new GridPath();
-document.getElementById("arrow-head")?.setAttribute("markerHeight", props.scale/6+'');
-let maxX = 0;
-let maxY = 0;
-// function drawArrow(points: any) {
-//     let path = StringifyBreakPointsToPath(points, 40);
-//     const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path")
-//     arrow.setAttribute("d", path);
-//     let rot = Math.floor(Rand() * 360);
-//     arrow.style.filter = `hue-rotate(${rot}deg)`;
-//     return arrow;
-// }
-let gridGroup: SVGGElement | null = null;
-let rootGroup: SVGGElement | null = null;
-function drawGrid(x: number, y: number) {
-    if(gridGroup) gridGroup.remove();
-    gridGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    document.getElementById("svg")?.appendChild(gridGroup);
-    for (let i = 1; i <= x + 2; i++) {
-        for (let j = 1; j <= y + 2; j++) {
-            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            rect.setAttribute("x", (i * props.scale).toString());
-            rect.setAttribute("y", (j * props.scale).toString());
-            gridGroup.appendChild(rect);
-        }
-    }
-}
-
 const svg = document.getElementById("svg");
+let rootGroup: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg", "g");
+rootGroup.classList.add("rootGroup");
+let gridGroup: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg", "g");
+gridGroup.classList.add("gridGroup");
+let arrowGroup: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg", "g");
+arrowGroup.classList.add("arrowGroup");
+rootGroup.appendChild(gridGroup);
+rootGroup.appendChild(arrowGroup);
+svg?.appendChild(rootGroup);
+document.getElementById("arrow-head")?.setAttribute("markerHeight", Math.max(6,props.scale/6)+'');
+let gridPath = new GridPath();
 
 
-let count = 0;
 
-drawGrid(props.width, props.height);
-// if(svg){
-//     // inner width
-    
-//     svg.style.width = `${props.width * props.scale + 100}px`;
-//     svg.style.height = `${props.height * props.scale + 100}px`;
-// }
-let arrows: SVGPathElement[] = [];
-async function clear() {
-    return new Promise(resolve => {
 
-        let interval = setInterval(() => {
-            arrows.pop()?.remove();
-            if (arrows.length == 0) {
-                clearInterval(interval);
-                resolve(void 0);
-                return;
-            }
-        }, 1);
-    });
-}
+
+
+
+// let arrows: SVGPathElement[] = [];
 function draw() {
-    rootGroup?.remove();
-    rootGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    svg?.appendChild(rootGroup);
-    // console.log("Grid",JSON.parse(JSON.stringify(gridPath.Grid)));
-    // console.log("draw");
-    for(let i = props.maxRank; i >=0 ; i--){
-    // for(let i = 0; i < props.maxRank; i++){
-        let cells = gridPath.getPeremeterCellsCercular(i);
-        console.log(`get Peremeter Cells ${i}`,cells.length, cells);
-        cells = cells.sort((a,b)=>Rand() - 0.5);
-        // console.log(`get Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
-        cells = cells.filter(cell=>cell.Arrow == null);
-        // console.log(`get Empty Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
-        for(let cell of cells){
-            if(cell.Arrow != null) continue;
-            let arrow = gridPath.GenerateArrow(cell, props.maxLength, i);
-            if(arrow == null) continue;
-            let [arrowElement,collisionElement] = arrow.GetArrowElement();
-            arrows.push(arrowElement);
-            arrows.push(collisionElement);
-            rootGroup?.appendChild(collisionElement);
-            rootGroup?.appendChild(arrowElement);
-            gridPath.AddArrow(arrow);
-        }
+    
+    if(!arrowGroup){
+        arrowGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        arrowGroup.classList.add("arrowGroup");
+    } else {
+        arrowGroup.innerHTML = "";
     }
-    // for(let i = 0; i < props.maxRank; i++){
+    rootGroup.appendChild(arrowGroup);
+    // place the starting arrow
+    let arrow = drawStartingArrow();
+    let counter = 0;
+    while(arrow !== undefined && counter < 100){
+        arrow = drawStartingArrow();
+        counter++;
+    }
+    if(counter >= 100){
+        console.error("Failed to generate starting arrow! Max attempts reached!");
+        alert("Failed to generate starting arrow! Max attempts reached!");
+    }
+    // for(let i = props.maxRank; i >=props.maxRank-3 ; i--){
+    // // for(let i = 0; i < props.maxRank; i++){
     //     let cells = gridPath.getPeremeterCells(i);
+    //     console.log(`get Peremeter Cells ${i}`,cells.length, cells);
     //     cells = cells.sort((a,b)=>Rand() - 0.5);
-    //     // console.log(`get Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
     //     cells = cells.filter(cell=>cell.Arrow == null);
-    //     // console.log(`get Empty Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
     //     for(let cell of cells){
     //         if(cell.Arrow != null) continue;
-    //         let arrow = gridPath.GenerateArrow(cell, props.maxLength, i);
+    //         let arrow = gridPath.GenerateArrow(cell, props.maxLength, props.maxRank-i);
     //         if(arrow == null) continue;
     //         let [arrowElement,collisionElement] = arrow.GetArrowElement();
-    //         arrows.push(arrowElement);
-    //         arrows.push(collisionElement);
-    //         rootGroup?.appendChild(collisionElement);
-    //         rootGroup?.appendChild(arrowElement);
+    //         // arrows.push(arrowElement);
+    //         // arrows.push(collisionElement);
+    //         arrowGroup?.appendChild(collisionElement);
+    //         arrowGroup?.appendChild(arrowElement);
     //         gridPath.AddArrow(arrow);
     //     }
     // }
-    // count++;
-    // if (count > 10) {
-    //     return;
-    // }
-
-    // let i = 0;
-    // while(i < width * height / 2) {
-    //     i++;
-    //     let start = gridPath.getRandomEmptyCellEdge();
-    //     if(start == null) continue;
-    //     let path = gridPath.GenerateArrow(start, 10);
-    //     // console.log(path);
-    //     if (path == null) continue;
-    //     let arrow = path.GetArrowElement();
-        
-    //     arrows.push(arrow);
-    //     // console.log(arrow);
-    //     svg?.appendChild(arrow);
-    // }
-    // i=0;
-    // while(i < width * height / 2) {
-    //     i++;
-    //     let start = gridPath.getRandomEmptyCell();
-    //     if(start == null) continue;
-    //     let path = gridPath.GenerateArrow(start, 10);
-    //     // console.log(path);
-    //     if (path == null) continue;
-    //     let arrow = path.GetArrowElement();
-
-    //     arrows.push(arrow);
-    //     // console.log(arrow);
-    //     svg?.appendChild(arrow);
-    // }
     centersvg();
+    
+}
+function drawStartingArrow(){
+    console.log("drawStartingArrow");
+    let cell = gridPath.GetRandomEmptyCell();
+    if(!cell){
+        console.error("No empty cell found! Failed to generate starting arrow!");
+        // alert("No empty cell found! Failed to generate starting arrow!");
+        return undefined;
+    }
+    let arrow = gridPath.GenerateArrow(cell, props.maxLength, 1);
+    if(!arrow){
+        console.error("No arrow found! Failed to generate starting arrow!", cell);
+        cell.Rank = -1;
+        // alert("No arrow found! Failed to generate starting arrow!");
+        return null;
+    }
+    let [arrowElement,collisionElement] = arrow.GetArrowElement();
+    arrowGroup?.appendChild(collisionElement);
+    arrowGroup?.appendChild(arrowElement);
+    gridPath.AddArrow(arrow);
+    // gridPath.getArrowHeadRay(arrow).forEach(cell=>{
+    //     cell.fillColor("green");
+    // });
+    drawFollowingArrows(2);
+    return arrow;
+}
+function drawFollowingArrows(rank: number){
+    let counter = 0;
+    let cell = gridPath.getEmptyCellByRank(rank);
+    
+    if(!cell){
+        console.warn("No empty cell for next rank", rank);
+        return false;
+    }
+    
+    while(cell){
+        let arrow = gridPath.GenerateArrow(cell, props.maxLength, rank);
+        if(!arrow){
+            console.warn("No arrow found! Failed to generate arrow for rank", rank, cell);
+            cell.Rank = -1;
+            cell = gridPath.getEmptyCellByRank(rank); 
+            continue;
+        }
+        counter++;
+        let [arrowElement,collisionElement] = arrow.GetArrowElement();
+        
+        arrowGroup?.appendChild(collisionElement);
+        arrowGroup?.appendChild(arrowElement);
+        gridPath.AddArrow(arrow);
+        // gridPath.getArrowHeadRay(arrow).forEach(cell=>{
+        cell = gridPath.getEmptyCellByRank(rank);
+        if(counter > 100){
+            console.error("Failed to generate arrow for rank", rank, cell);
+            alert("Failed to generate arrow for rank "+rank+" | Looping for too long");
+            return false;
+        }
+    }
+    console.log("drawFollowingArrows", counter);
+    drawFollowingArrows(rank+1);
+    return true;
+    
 }
 draw();
 function restart(){
+    [...rootGroup.children].forEach(child=>child.remove());
     rngSeed = (document.getElementById("level") as HTMLInputElement)?.valueAsNumber ?? 1;
     if(rngSeed == 0){
         rngSeed = Math.floor(Math.random()* 4836651);
@@ -175,30 +165,61 @@ function restart(){
     props.straightness = (document.getElementById("straightness") as HTMLInputElement)?.valueAsNumber ?? 0.95;
     localStorage.setItem("props", JSON.stringify(props));
     rngSeed = props.level>0?props.level:Math.floor(Math.random()* 4836651);
+    window.location.hash = `level=${rngSeed}`;
 
     
-    drawGrid(props.width, props.height);
+    // drawGrid(props.width, props.height);
     // if(svg){
     //     // inner width
         
     //     svg.style.width = "100%";
     //     svg.style.height = "100%";
     // }
+    gridGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    gridGroup.classList.add("gridGroup");
+    rootGroup.appendChild(gridGroup);
     gridPath = new GridPath();
     draw();
 }
-function centersvg(){
-    let tX = props.width * props.scale / 2;
-    let tY = props.height * props.scale / 2;
-    let rect = svg?.getBoundingClientRect();
-    if(rect){
-        tX = rect.width / 2 - tX;
-        tY = rect.height / 2 - tY;
+function hint(){
+    let arrow = gridPath.Hint();
+    if(!arrow) return;
+    arrow.Color = "pink";
+    arrow.GetArrowElement()[1].style.stroke = "pink";
+}
+function validateLevel(){
+    let valid = gridPath.ValidateLevel();
+    console.log(valid);
+    if(valid){
+        document.getElementById("RestartButton")?.click();
+    } else {
+        alert("Level is invalid!");
     }
-    (svg as any).dataTX = tX;
-    (svg as any).dataTY = tY;
-    if(rootGroup) rootGroup.style.transform = `translate(${tX}px,${tY}px)`;
-    if(gridGroup) gridGroup.style.transform = `translate(${tX}px,${tY}px)`;
+    
+}
+function centersvg(){
+    let rect = svg?.getBoundingClientRect();
+    if(!rect) return;
+    const tX = rect.width / 2 - (props.width * props.scale )/2;
+    const tY = rect.height / 2 - (props.height * props.scale )/2;
+    console.log({tX,tY});
+    console.log(props.width * props.scale,props.height * props.scale);
+    console.log(rootGroup.getBoundingClientRect());
+    console.log(rect);
+
+    rootGroup.style.transform = `translate(${tX}px,${tY}px)`;
+    (rootGroup as any).dataTX = tX;
+    (rootGroup as any).dataTY = tY;
+}
+function validateRay(arrow: Arrow){
+    gridPath.GetAllCells().forEach(cell=>{
+        cell.fillColor("none");
+    });
+
+    let ray = gridPath.getArrowHeadRay(arrow);
+    ray.forEach(cell=>{
+        cell.fillColor("green");
+    });
 }
 let dragging = false;
 let dragX = 0;
@@ -207,13 +228,12 @@ const mouseMoveEvent = (clientX: number, clientY: number, buttons: number) => {
     // console.log(e.buttons, dragging);
     if(buttons !== 1){
         if(dragging){
-            let tX = (svg as any).dataTX ?? 0;
-            let tY = (svg as any).dataTY ?? 0;
-            (svg as any).dataTX = tX + clientX - dragX;
-            (svg as any).dataTY = tY + clientY - dragY;
+            let tX = (rootGroup as any).dataTX ?? 0;
+            let tY = (rootGroup as any).dataTY ?? 0;
+            (rootGroup as any).dataTX = tX + clientX - dragX;
+            (rootGroup as any).dataTY = tY + clientY - dragY;
             dragX = clientX;
             dragY = clientY;
-    
         }
         dragging = false;
         return;
@@ -225,37 +245,39 @@ const mouseMoveEvent = (clientX: number, clientY: number, buttons: number) => {
         return;
     }
     if(dragging){
-        let tX = (svg as any).dataTX ?? 0;
-        let tY = (svg as any).dataTY ?? 0;
-        tX = tX + clientX - dragX;
-        tY = tY + clientY - dragY;
-        // svg?.setAttribute("transform", `translate(${tX}px,${tY}px)`);
+        let rect = svg?.getBoundingClientRect();
+        let tX = ((rootGroup as any).dataTX ?? 0)+ clientX - dragX;
+        let tY = ((rootGroup as any).dataTY ?? 0) + clientY - dragY;
+        if(rect){
+            let gw = rootGroup?.getBoundingClientRect()?.width ?? 0;
+            let gh = rootGroup?.getBoundingClientRect()?.height ?? 0;
+            tX = Math.max((gw-10)*-1, Math.min(tX, rect.width -10));
+            tY = Math.max((gh-10)*-1, Math.min(tY, rect.height -10));
+        }
         if(rootGroup) rootGroup.style.transform = `translate(${tX}px,${tY}px)`;
-        if(gridGroup) gridGroup.style.transform = `translate(${tX}px,${tY}px)`;
-
     }
 }
 const mouseUpEvent = (clientX: number, clientY: number) => {
     if(dragging){
         
-        let tX = (svg as any).dataTX ?? 0;
-        let tY = (svg as any).dataTY ?? 0;
-        (svg as any).dataTX = tX + clientX - dragX;
-        (svg as any).dataTY = tY + clientY - dragY;
+        let tX = (rootGroup as any).dataTX ?? 0;
+        let tY = (rootGroup as any).dataTY ?? 0;
+        (rootGroup as any).dataTX = tX + clientX - dragX;
+        (rootGroup as any).dataTY = tY + clientY - dragY;
         dragX = clientX;
         dragY = clientY;
-        mouseUpBlocked = (Math.abs((svg as any).dataTX) > 5) || (Math.abs((svg as any).dataTY) > 5);
+        mouseUpBlocked = (Math.abs(clientX - dragX) + Math.abs(clientY - dragY)<=5);
     }
     dragging = false;
 }
-window.addEventListener("mousemove",(ev)=>{
+svg?.addEventListener("mousemove",(ev)=>{
     mouseMoveEvent(ev.clientX, ev.clientY, ev.buttons);
 }, {
     capture: true,
     passive: true
 });
 let mouseUpBlocked = false;
-window.addEventListener("mouseup",(ev)=>{
+svg?.addEventListener("mouseup",(ev)=>{
     if(dragging){
         ev.preventDefault();
         ev.stopPropagation();
