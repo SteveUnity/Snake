@@ -34,8 +34,10 @@ class GridPath{
     public DeleteArrow(arrow: Arrow){
         this.arrows.delete(arrow.Id.toString());
         if(this.arrows.size === 0){
-            console.warn("No More Arrows, You Win!");
-            window.alert("No More Arrows, You Win!");
+            setTimeout(() => {
+                console.warn("No More Arrows, You Win!");
+                window.alert("No More Arrows, You Win!");
+            }, 1000);
         }
     }
     public AddArrow(arrow: Arrow){
@@ -102,6 +104,18 @@ class GridPath{
         } while(failedCounter < 4)
         return null;
     }
+    public getPeremeterCellsCercular(index: number): Cell[]{
+        let perimeterCells =[...this.grid.flat().filter(cell=>{
+            let w = Math.abs(cell.Id[0] - props.width/2);
+            let h = Math.abs(cell.Id[1] - props.height/2);
+            if(w*w + h*h <= index*index){
+                return true;
+            }
+            return false;
+            
+        })];
+        return perimeterCells;
+    }
     public getPeremeterCells(index: number): Cell[]{
         let perimeterCells =[...this.grid.flat().filter(cell=>{
             if(cell.Id[0] === index && cell.Id[1] >= index && cell.Id[1] < props.height- index){
@@ -141,11 +155,13 @@ class GridPath{
                 // console.log("collidingArrow", collidingArrow.Id);
                 return null;
             }
+            collidingArrow = ray.find(cell=>cell.Arrow );
             // find if arrow points at higher rank or same rank arrow
-            let higherRankArrow = ray.find(cell=>cell.Arrow && cell.Arrow.Rank >= arrow.Rank);
+            let higherRankArrow = ray.find(cell=>cell.Arrow && cell.Arrow.Rank <= arrow.Rank);
             if(higherRankArrow){
                 // console.log("higherRankArrow", higherRankArrow.Id);
                 return null;
+                arrow.Color = "#0f0";
             }
         }
 
@@ -265,7 +281,6 @@ class GridPath{
         }
         return [];
     }
-    
 }
 enum Direction{
     UP = 0,
@@ -274,6 +289,7 @@ enum Direction{
     LEFT = 3,
 }
 class Arrow{
+    private color: string = "";
     private id:[number,number];
     private direction: Direction = Direction.UP;
     private path: [number, number][] = [];
@@ -310,6 +326,13 @@ class Arrow{
     get TailCell(){
         return this.path[this.path.length-1];
     }
+    get Color(){
+        return this.color;
+    }
+    set Color(color: string){
+        this.color = color;
+        if(this.arrowElement) this.arrowElement.style.stroke = this.color;
+    }
     AddPoint(point: [number, number]){
         this.path.push(point);
     }
@@ -323,8 +346,14 @@ class Arrow{
         const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
         arrow.setAttribute("d", d);
         arrow.classList.add("arrowElement");
-        let rot =  (200/props.maxRank)*(this.rank);
-        arrow.style.filter = `hue-rotate(${rot+50}deg)`;
+        // arrow.style.stroke = this._invalid? "#ff0000" : ["#05a","#0089bf","#12a900","#ff7500"][this.direction];
+        let colors = [ ];props.maxRank/255;
+        for(let i = 0; i < props.maxRank; i++){
+            colors.push(`rgb(${Math.round(i/props.maxRank*255)},${Math.round(i/props.maxRank*255)},255)`);
+        }
+
+        const color=this.color==""?colors[this.rank]:this.color;
+        arrow.style.stroke = color;
         arrow.style.strokeWidth = props.scale/5+'';
         // arrow.addEventListener("click", () => {
         //     console.log("click", this,arrow);
@@ -570,13 +599,14 @@ class Arrow{
         d += ` L ${expPoints[expPoints.length - 1].join(' ')}`;
         return d;
     }
-    
 }
 class Cell {
     private id: [number, number];
+    private idstr: string;
     private arrow: Arrow | null;
     constructor(id: [number, number], arrow: Arrow | null){
         this.id = id;
+        this.idstr = `${id[0]},${id[1]}`;
         this.arrow = arrow;
     }
     get Id(){

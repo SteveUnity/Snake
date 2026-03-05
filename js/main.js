@@ -39,26 +39,30 @@ let maxY = 0;
 //     arrow.style.filter = `hue-rotate(${rot}deg)`;
 //     return arrow;
 // }
+let gridGroup = null;
+let rootGroup = null;
 function drawGrid(x, y) {
-    let group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    document.getElementById("svg")?.appendChild(group);
+    if (gridGroup)
+        gridGroup.remove();
+    gridGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    document.getElementById("svg")?.appendChild(gridGroup);
     for (let i = 1; i <= x + 2; i++) {
         for (let j = 1; j <= y + 2; j++) {
             const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
             rect.setAttribute("x", (i * props.scale).toString());
             rect.setAttribute("y", (j * props.scale).toString());
-            group.appendChild(rect);
+            gridGroup.appendChild(rect);
         }
     }
 }
 const svg = document.getElementById("svg");
 let count = 0;
 drawGrid(props.width, props.height);
-if (svg) {
-    // inner width
-    svg.style.width = `${props.width * props.scale + 100}px`;
-    svg.style.height = `${props.height * props.scale + 100}px`;
-}
+// if(svg){
+//     // inner width
+//     svg.style.width = `${props.width * props.scale + 100}px`;
+//     svg.style.height = `${props.height * props.scale + 100}px`;
+// }
 let arrows = [];
 async function clear() {
     return new Promise(resolve => {
@@ -72,13 +76,16 @@ async function clear() {
         }, 1);
     });
 }
-let root = document.createElementNS("http://www.w3.org/2000/svg", "g");
 function draw() {
-    svg?.appendChild(root);
+    rootGroup?.remove();
+    rootGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    svg?.appendChild(rootGroup);
     // console.log("Grid",JSON.parse(JSON.stringify(gridPath.Grid)));
     // console.log("draw");
-    for (let i = 0; i < props.maxRank; i++) {
-        let cells = gridPath.getPeremeterCells(i);
+    for (let i = props.maxRank; i >= 0; i--) {
+        // for(let i = 0; i < props.maxRank; i++){
+        let cells = gridPath.getPeremeterCellsCercular(i);
+        console.log(`get Peremeter Cells ${i}`, cells.length, cells);
         cells = cells.sort((a, b) => Rand() - 0.5);
         // console.log(`get Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
         cells = cells.filter(cell => cell.Arrow == null);
@@ -92,31 +99,29 @@ function draw() {
             let [arrowElement, collisionElement] = arrow.GetArrowElement();
             arrows.push(arrowElement);
             arrows.push(collisionElement);
-            root?.appendChild(collisionElement);
-            root?.appendChild(arrowElement);
+            rootGroup?.appendChild(collisionElement);
+            rootGroup?.appendChild(arrowElement);
             gridPath.AddArrow(arrow);
         }
     }
-    for (let i = 0; i < props.maxRank; i++) {
-        let cells = gridPath.getPeremeterCells(i);
-        cells = cells.sort((a, b) => Rand() - 0.5);
-        // console.log(`get Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
-        cells = cells.filter(cell => cell.Arrow == null);
-        // console.log(`get Empty Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
-        for (let cell of cells) {
-            if (cell.Arrow != null)
-                continue;
-            let arrow = gridPath.GenerateArrow(cell, props.maxLength, i);
-            if (arrow == null)
-                continue;
-            let [arrowElement, collisionElement] = arrow.GetArrowElement();
-            arrows.push(arrowElement);
-            arrows.push(collisionElement);
-            root?.appendChild(collisionElement);
-            root?.appendChild(arrowElement);
-            gridPath.AddArrow(arrow);
-        }
-    }
+    // for(let i = 0; i < props.maxRank; i++){
+    //     let cells = gridPath.getPeremeterCells(i);
+    //     cells = cells.sort((a,b)=>Rand() - 0.5);
+    //     // console.log(`get Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
+    //     cells = cells.filter(cell=>cell.Arrow == null);
+    //     // console.log(`get Empty Peremeter Cells ${i}`,JSON.parse(JSON.stringify(cells)));
+    //     for(let cell of cells){
+    //         if(cell.Arrow != null) continue;
+    //         let arrow = gridPath.GenerateArrow(cell, props.maxLength, i);
+    //         if(arrow == null) continue;
+    //         let [arrowElement,collisionElement] = arrow.GetArrowElement();
+    //         arrows.push(arrowElement);
+    //         arrows.push(collisionElement);
+    //         rootGroup?.appendChild(collisionElement);
+    //         rootGroup?.appendChild(arrowElement);
+    //         gridPath.AddArrow(arrow);
+    //     }
+    // }
     // count++;
     // if (count > 10) {
     //     return;
@@ -147,6 +152,7 @@ function draw() {
     //     // console.log(arrow);
     //     svg?.appendChild(arrow);
     // }
+    centersvg();
 }
 draw();
 function restart() {
@@ -162,10 +168,29 @@ function restart() {
     props.straightness = document.getElementById("straightness")?.valueAsNumber ?? 0.95;
     localStorage.setItem("props", JSON.stringify(props));
     rngSeed = props.level > 0 ? props.level : Math.floor(Math.random() * 4836651);
-    root?.remove();
-    root = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    drawGrid(props.width, props.height);
+    // if(svg){
+    //     // inner width
+    //     svg.style.width = "100%";
+    //     svg.style.height = "100%";
+    // }
     gridPath = new GridPath();
     draw();
+}
+function centersvg() {
+    let tX = props.width * props.scale / 2;
+    let tY = props.height * props.scale / 2;
+    let rect = svg?.getBoundingClientRect();
+    if (rect) {
+        tX = rect.width / 2 - tX;
+        tY = rect.height / 2 - tY;
+    }
+    svg.dataTX = tX;
+    svg.dataTY = tY;
+    if (rootGroup)
+        rootGroup.style.transform = `translate(${tX}px,${tY}px)`;
+    if (gridGroup)
+        gridGroup.style.transform = `translate(${tX}px,${tY}px)`;
 }
 let dragging = false;
 let dragX = 0;
@@ -196,9 +221,10 @@ const mouseMoveEvent = (clientX, clientY, buttons) => {
         tX = tX + clientX - dragX;
         tY = tY + clientY - dragY;
         // svg?.setAttribute("transform", `translate(${tX}px,${tY}px)`);
-        if (!svg)
-            return;
-        root.style.transform = `translate(${tX}px,${tY}px)`;
+        if (rootGroup)
+            rootGroup.style.transform = `translate(${tX}px,${tY}px)`;
+        if (gridGroup)
+            gridGroup.style.transform = `translate(${tX}px,${tY}px)`;
     }
 };
 const mouseUpEvent = (clientX, clientY) => {
@@ -209,7 +235,7 @@ const mouseUpEvent = (clientX, clientY) => {
         svg.dataTY = tY + clientY - dragY;
         dragX = clientX;
         dragY = clientY;
-        mouseUpBlocked = (Math.abs(svg.dataTX) > 3) || (Math.abs(svg.dataTY) > 3);
+        mouseUpBlocked = (Math.abs(svg.dataTX) > 5) || (Math.abs(svg.dataTY) > 5);
     }
     dragging = false;
 };
