@@ -8,7 +8,7 @@ const props = JSON.parse(localStorage.getItem("props") ?? `{
     "straightness" : 0.95
 }`);
 props.maxRank = Math.floor(Math.min(props.width, props.height) / 2);
-props.scale = 40;
+props.scale = 25;
 props.offset = 0;
 props.radius = 4;
 document.getElementById("level").value = props.level.toString();
