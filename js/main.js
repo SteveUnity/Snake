@@ -254,14 +254,14 @@ const mouseUpEvent = (clientX, clientY) => {
     }
     dragging = false;
 };
-svg?.addEventListener("mousemove", (ev) => {
+svg?.addEventListener("pointermove", (ev) => {
     mouseMoveEvent(ev.clientX, ev.clientY, ev.buttons);
 }, {
     capture: true,
     passive: true
 });
 let mouseUpBlocked = false;
-svg?.addEventListener("mouseup", (ev) => {
+svg?.addEventListener("pointerup", (ev) => {
     if (dragging) {
         ev.preventDefault();
         ev.stopPropagation();
