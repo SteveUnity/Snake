@@ -9,6 +9,7 @@ const props:{
     scale: number;
     offset: number;
     radius: number;
+    seedShift: number;
 } =JSON.parse(localStorage.getItem("props")??  `{
     "level" : 1,
     "width" : 20,
@@ -18,20 +19,45 @@ const props:{
     "straightness" : 0.95
 }`);
 
-props.maxRank = Math.floor(Math.min(props.width, props.height)/2);
-props.scale = 40;
+props.maxRank = 10;
+props.scale = 20;
 props.offset = 0;
 props.radius = 4;
+props.seedShift = 4885;
 (<HTMLInputElement>document.getElementById("level")).value = props.level.toString();
 (<HTMLInputElement>document.getElementById("width")).value = props.width.toString();
 (<HTMLInputElement>document.getElementById("height")).value = props.height.toString();
 (<HTMLInputElement>document.getElementById("maxLength")).value = props.maxLength.toString();
 (<HTMLInputElement>document.getElementById("jiggle")).value = props.jiggle.toString();
 (<HTMLInputElement>document.getElementById("straightness")).value = props.straightness.toString();
+/**
+     * Creates a seeded pseudorandom number generator (Mulberry32 algorithm)
+     * @param {number} seed - Any integer seed value
+     * @returns {function} - Function that returns a random number in [0, 1)
+     */
+function seededRandomGenerator(seed: number) {
+    // Ensure seed is a 32-bit unsigned integer
+    let state = seed >>> 0;
+
+    return function () {
+        // Mulberry32 algorithm
+        state += 0x6D2B79F5;
+        let t = Math.imul(state ^ (state >>> 15), 1 | state);
+        t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+let rngSeed = props.level>0?props.level:Math.floor(Math.random()* 4836651);
+
+// const rng = seededRandomGenerator(rngSeed);
+function Rand(){
+    return seededRandomGenerator(rngSeed++)()
+}
 class GridPath{
     private grid: Array<Array<Cell>> = [];
     private arrows: Map<string, Arrow> = new Map();
     constructor(){
+        // rngSeed = seededRandomGenerator(props.seedShift+(props.seedShift*props.level))();
         
         for (let w = 0; w < props.width; w++) {
             let row = [];
@@ -42,6 +68,7 @@ class GridPath{
             // this.grid.push(new Array(this.height).fill(null));
         }
     }
+    
     public DeleteArrow(arrow: Arrow){
         this.arrows.delete(arrow.Id.toString());
         if(this.arrows.size === 0){
@@ -68,19 +95,58 @@ class GridPath{
         }
         return cells[Math.floor(Rand() * cells.length)];
     }
-    public getEmptyCellByRank(rank: number): Cell|null{
-        let cells = this.grid.flat().filter(cell=>cell.Rank == rank && cell.Arrow == null);
+
+    public getEmptyCellWithRank(): Cell|null{
+        let cells = this.grid.flat().filter(cell=>cell.Rank >= 0 && cell.Arrow == null);
         if(cells.length === 0){
             return null;
         }
         return cells[Math.floor(Rand() * cells.length)];
     }
-    private getNextEmptyCell(prev:Cell,direction: Direction|null,randomness: number = 0.95,rank: number = 0): {direction: Direction, cell: Cell} | null {
-        if(direction == null){
-            direction = Math.floor(Rand() * 4);
-        } else {
-            direction =Rand()>randomness? Math.floor(Rand() * 4) : direction;
+    public getEmptyCellByRank(rank: number): Cell|null{
+        let cells = this.grid.flat().filter(cell=>(cell.Rank >= rank || cell.Rank == 0) && cell.Arrow == null);
+        if(cells.length === 0){
+            return null;
         }
+        return cells[Math.floor(Rand() * cells.length)];
+    }
+    private lastDirection: Direction|null = null;
+    private findNextEmptyCell(prev:Cell,prefDir: Direction|null): {direction: Direction, cell: Cell} | null {
+        if(prefDir == null) prefDir = Math.floor(Rand() * 4) as Direction;
+        let x = prev.Id[0];
+        let y = prev.Id[1];
+        for (let i = 0; i < 4; i++) {
+            let direction = (prefDir + i) % 4;
+            let cell:Cell;
+            switch (direction) {
+                case Direction.UP:
+                    cell = this.grid[x]?.[y-1];
+                    break;
+                case Direction.RIGHT:
+                    cell = this.grid[x+1]?.[y];
+                    break;
+                case Direction.DOWN:
+                    cell = this.grid[x]?.[y+1];
+                    break;
+                case Direction.LEFT:
+                    cell = this.grid[x-1]?.[y];
+                    break;
+                default:
+                    cell = this.grid[x]?.[y+1];
+                    break;
+            }
+            if(cell && cell.Arrow == null){
+                return {direction, cell};
+            }
+        }
+        return null;
+    }
+    private getNextEmptyCell(prev:Cell,direction: Direction|null,randomness: number = 0.95,rank: number = Infinity): {direction: Direction, cell: Cell} | null {
+        if(this.lastDirection == null) this.lastDirection = Math.floor(Rand() * 4);
+        if(direction == null){
+            direction = randomness>Rand()? Math.floor(Rand() * 4): this.lastDirection;
+        }
+        this.lastDirection = direction;
         let failedCounter = 0;
         let x = prev.Id[0];
         let y = prev.Id[1];
@@ -149,76 +215,178 @@ class GridPath{
             })];
         return perimeterCells;
     }
+    public getEmptyRegion(startCell: Cell): {region:Cell[],edge:Cell[]}{
+        let region: Cell[] = [];
+        let edge:Cell[] = []
+        let queue: Cell[] = [startCell];
+        while(queue.length > 0){
+            let cell = queue.pop();
+            if(cell == null) continue;
+            let neighborCount = 0;
+            if(cell.Id[0]>0){
+                let neighborLeft = this.grid[cell.Id[0]-1][cell.Id[1]];
+                if(neighborLeft && neighborLeft.Arrow == null){
+                    if(!region.includes(neighborLeft)){
+                        queue.push(neighborLeft);
+                    }
+                    neighborCount++;
+                }
+            }
+            if(cell.Id[0]<props.height-1){
+                let neighborRight = this.grid[cell.Id[0]+1][cell.Id[1]];
+                if(neighborRight && neighborRight.Arrow == null){
+                    if(!region.includes(neighborRight)){
+                        queue.push(neighborRight);
+                    }
+                    neighborCount++;
+                }
+            }
+            if(cell.Id[1]>0){
+                let neighborTop = this.grid[cell.Id[0]][cell.Id[1]-1];
+                if(neighborTop && neighborTop.Arrow == null){
+                    if(!region.includes(neighborTop)){
+                        queue.push(neighborTop);
+                    }
+                    neighborCount++;
+                }
+            }
+            if(cell.Id[1]<props.height-1){
+                let neighborBottom = this.grid[cell.Id[0]][cell.Id[1]+1];
+                if(neighborBottom && neighborBottom.Arrow == null){
+                    if(!region.includes(neighborBottom)){
+                        queue.push(neighborBottom);
+                    }
+                    neighborCount++;
+                }
+            }
+            region.push(cell);
+            if(neighborCount == 1){
+                edge.push(cell);
+            }
+        }
+        return {region, edge};
+    }
     // private ValidateCellForArrow(Arrow: Arrow, cell: Cell): boolean{
     //     // arrow cannot point to itself
     //     // arrow cannot point to another arrows head
         
     // }
-    GenerateArrow(startCell: Cell, length: number,rank: number): Arrow|null{
+    async GenerateArrow(startCell: Cell, length: number,rank: number): Promise<Arrow|null>{
         // cannot point to an arrow head in the opposite direction (looking at each other)
         // cannot point to its own body
-        let nextCell = this.getNextEmptyCell(startCell,null,props.straightness);
-        if(nextCell == null){
-            return null;
-        }
-        let arrow = new Arrow(startCell.Id, nextCell.direction,rank);
-        // check if the arrow points to an arrow head in the opposite direction (looking at each other)
-        let ray = this.getArrowHeadRay(arrow);
-        {
-            let collidingArrow = ray.find(cell=>cell.Arrow && cell.Arrow.Direction == (arrow.Direction+2)%4 && cell.Arrow.TailCell[0] == cell.Id[0] && cell.Arrow.TailCell[1] == cell.Id[1]);
-            if(collidingArrow){
-                // console.log("collidingArrow", collidingArrow.Id);
-                return null;
+        
+        const Cells: Cell[] = [];
+        const Rotations = [Direction.UP, Direction.RIGHT, Direction.DOWN, Direction.LEFT].sort(()=>Rand()*2-1);
+        let ray: Cell[]|null = null;
+        let arrow: Arrow|null = null;
+        let maxRank = startCell.Rank>rank?startCell.Rank:rank;
+        let nextCell: {direction: Direction, cell: Cell}|null = null;
+        while(Rotations.length > 0){
+            let direction = Rotations.pop() as Direction;
+            nextCell = this.findNextEmptyCell(startCell,direction);
+            // must contain at least two cells (start cell and next cell)
+            if(nextCell == null){
+                continue;
             }
-            collidingArrow = ray.find(cell=>cell.Arrow );
-            // find if arrow points at higher rank or same rank arrow
-            
-            // ray.forEach(cell=>cell.Rank = arrow.Rank+1);
-            for(let cell of ray){
-                if(cell.Rank>0 && cell.Rank<=arrow.Rank && cell.Arrow !== null){
-                    console.error("collidingArrow lower rank", cell, arrow, rank);
+            if(nextCell.cell.Rank>maxRank) maxRank = nextCell.cell.Rank;
+            arrow = new Arrow(startCell.Id, nextCell.direction,maxRank);
+            if(arrow == null) continue;
+            // check if the arrow points to an arrow head in the opposite direction (looking at each other)
+            ray = this.getArrowHeadRay(arrow);
+            let collidingArrow = ray.find(cell=>{
+                if(!arrow) return false;
+                // empty cells are not considered
+                if(!cell.Arrow) return false;
+                // if the arrow is pointing at a lower rank arrow
+                if(cell.Rank< arrow.Rank) {err("Arrow blocked by lower rank arrow");return true;}
+                // if the arrow points to an arrow head in the opposite direction (looking at each other)
+
+                if(cell.Arrow.TailCell[0] == cell.Id[0] && cell.Arrow.TailCell[1] == cell.Id[1] && cell.Arrow.Direction == (arrow.Direction+2)%4) 
+                    {err("Arrow blocked by looking at each other");return true;}
+                // if the arrow is pointing at its own body
+                //! this is not possible
+                // if(cell.Arrow.TailCell[0] == cell.Id[0] && cell.Arrow.TailCell[1] == cell.Id[1]) return true;
+                return false;
+            });
+            if(collidingArrow) {
+                arrow = null;
+                continue;
+            }
+            break;
+        }
+        if(!arrow || !nextCell) {err("No arrow found in four directions");return null;}
+        // arrow is valid
+        // if(startCell.Rank == 0){
+        //     startCell.Rank = arrow.Rank;
+        // }
+        // if(nextCell.cell.Rank == 0){
+        //     nextCell.cell.Rank = arrow.Rank;
+        // }
+        arrow.AddPoint(nextCell.cell.Id);
+        Cells.push(startCell);
+        Cells.push(nextCell.cell);
+        startCell.Arrow = arrow;
+        nextCell.cell.Arrow = arrow;
+        // mark all empty ray cells as ranking one higher than the arrow
+        if(!ray) ray = this.getArrowHeadRay(arrow);
+        for (let i = 2; i < length; i++) {
+            nextCell = this.findNextEmptyCell(nextCell.cell,null);
+            if(nextCell == null || ray.includes(nextCell.cell)){
+                break;
+            }
+            if(nextCell.cell.Rank>arrow.Rank) arrow.RankElevated = nextCell.cell.Rank;
+            arrow.AddPoint(nextCell.cell.Id);
+            Cells.push(nextCell.cell);
+            nextCell.cell.Arrow = arrow;
+            // nextCell.cell.Rank = arrow.Rank;
+        }
+        // arrow.RankElevated = maxRank;
+        for (const cell of ray) {
+            if(cell.Rank == 0){
+                cell.Rank = arrow.Rank+1;
+            } else if(cell.Rank<=arrow.Rank){
+                if(cell.Arrow == null){
+                    cell.Rank = arrow.Rank+1;
+                } else {
+                    for(const cell of Cells){
+                        cell.Arrow = null;
+                    }
+                    for(const cell of ray){
+                        cell.RevertRank();
+                    }
+                    err("Arrow blocked by another arrow after recalculating rank",{newRank: arrow.Rank,blocker: cell.Rank});
                     return null;
                 }
             }
         }
-        // arrow is valid
-        if(startCell.Rank == 0){
-            startCell.Rank = arrow.Rank;
+        for (const cell of Cells) {
+            cell.Arrow = arrow;
+            cell.Rank = arrow.Rank;
         }
-        if(nextCell.cell.Rank == 0){
-            nextCell.cell.Rank = arrow.Rank;
-        }
-        arrow.AddPoint(nextCell.cell.Id);
-        nextCell.cell.Arrow = arrow;
-        startCell.Arrow = arrow;
-        // mark all empty ray cells as ranking one higher than the arrow
-        ray.forEach(cell=>{
-            if(cell.Rank == 0){
-                cell.Rank = arrow.Rank+1;
-            }else if(cell.Rank<=arrow.Rank){
-                if(cell.Arrow == null) cell.Rank = arrow.Rank+1;
-                else return null;
-                // cell.invalidate();
-            }
-
-        });
-        for (let i = 2; i < length; i++) {
-            nextCell = this.getNextEmptyCell(nextCell.cell,nextCell.direction,props.straightness,arrow.Rank);
-            if(nextCell == null || ray.includes(nextCell.cell)){
-                break;
-            }
-            arrow.AddPoint(nextCell.cell.Id);
-            nextCell.cell.Arrow = arrow;
-            nextCell.cell.Rank = arrow.Rank;
-        }
+        startCell.fillColor("darkorange");
+        if(startCell.textElement)startCell.textElement.textContent = startCell.Rank+(Direction[(arrow.Direction+2)%4].toString()[0]);
+        await Main.PromisedDelay(10,JSON.stringify({rank,maxRank,dir:Direction[arrow.Direction]},null,4));
         return arrow;
     }
-    validateArrowHeadCollision(cell: Cell, direction: Direction): boolean{
-        if(!cell.Arrow) return false;
-        const lastCell = cell.Arrow.Path[cell.Arrow.Path.length-1];
-        if(lastCell[0] !== cell.Id[0] || lastCell[1] !== cell.Id[1]) return false;
-        if(cell.Arrow.Direction !== direction) return false;
-        return true;
+    ArrowBlocked(arrow:Arrow, ray?: Cell[]): boolean{
+        if(!ray) ray = this.getArrowHeadRay(arrow);
+        let blocked = ray.some(cell=>cell.Arrow !== null);
+        return blocked;
+    }
+    ArrowClearToExit(arrow:Arrow){
+        let ray = this.getArrowHeadRay(arrow);
+        let blocked = this.ArrowBlocked(arrow, ray);
+        if(blocked){
+            arrow.Color = "orangered";
+            return;
+        } else {
+            arrow.Color = null;
+            this.RemoveArrow(arrow);
+            arrow.ExitElements(ray);
+            this.DeleteArrow(arrow);
+        }
+        return;
+        
     }
     RemoveArrow(arrow: Arrow){
         let path = arrow.Path;
@@ -283,6 +451,15 @@ class GridPath{
             grid.push(row);
         }
         let arrows = [...this.arrows.values()];
+        const validateArrowExit = (arrow: Arrow, grid: boolean[][]): boolean => {
+            let ray = this.getArrowHeadRay(arrow);
+            for (const cell of ray) {
+                if(grid[cell.Id[0]][cell.Id[1]]){
+                    return false;
+                }
+            }
+            return true;
+        };
         let counter = 0;
         while(counter<arrows.length ){
             let arrow = arrows[counter];
@@ -307,16 +484,6 @@ class GridPath{
             }
         }
         return arrows.length === 0;
-
-        function validateArrowExit(arrow: Arrow, grid: boolean[][]): boolean{
-            let ray = gridPath.getArrowHeadRay(arrow);
-            for (const cell of ray) {
-                if(grid[cell.Id[0]][cell.Id[1]]){
-                    return false;
-                }
-            }
-            return true;
-        }
     }
 }
 enum Direction{
@@ -366,8 +533,8 @@ class Arrow{
     get Color(){
         return this.color;
     }
-    set Color(color: string){
-        this.color = color;
+    set Color(color: string|null){
+        this.color = color ?? "";
         if(this.arrowElement) this.arrowElement.style.stroke = this.color;
     }
     AddPoint(point: [number, number]){
@@ -376,7 +543,9 @@ class Arrow{
     GetPoints(): [number, number][]{
         return [...this.path];
     }
-    private colors = [60,90,120,150,180,210,240,270]
+    set RankElevated(rank: number){
+        this.rank = Math.max(this.rank, rank);
+    }
     GetArrowElement(): [SVGPathElement, SVGPathElement]{
         if(this.arrowElement && this.collisionElement) return [this.arrowElement, this.collisionElement];
         let d = this.stringifyBreakPointsToPath(this.path.reverse());
@@ -406,43 +575,56 @@ class Arrow{
         collisionElement.classList.add("collisionElement");
         collisionElement.style.strokeWidth = props.scale*1.1+'px';
         collisionElement.addEventListener("click", () => {
-            if(mouseUpBlocked) {
-                mouseUpBlocked = false;
+            if(Main.mouseUpBlocked) {
+                Main.mouseUpBlocked = false;
+                console.warn("mouseUpBlocked", Main.mouseUpBlocked);
                 return;
             }
             this.ClearToExit();
         });
         collisionElement.addEventListener("contextmenu", (e) => {
             e.preventDefault();
-            validateRay(this);
+            Main.validateRay(this);
         });
         this.collisionElement = collisionElement;
         return [arrow,collisionElement];
     }
-    RemoveForValidation(): void{
+    ExitElements(ray: Cell[]){
         this.collisionElement?.remove();
         this.collisionElement = null;
-        gridPath.RemoveArrow(this);
-        gridPath.DeleteArrow(this);
+        this.AnimateArrowExit(ray);
     }
     IsBlocked(ray?: Cell[]): boolean{
-        if(!ray) ray = gridPath.getArrowHeadRay(this);
+        if(!ray) ray = Main.gridPath.getArrowHeadRay(this);
         let blocked = ray.some(cell=>cell.Arrow !== null);
         return blocked;
     }
     ClearToExit(){
-        let ray = gridPath.getArrowHeadRay(this);
+        let ray = Main.gridPath.getArrowHeadRay(this);
         let blocked = this.IsBlocked(ray);
         if(blocked){
             this.arrowElement?.classList.add("collided");
+            let keyframes = [
+                {transform: `translate(1px, 1px)`},
+                {transform: `translate(0px, 0px)`},
+                {transform: `translate(-1px, -1px)`},
+                {transform: `translate(0px, 0px)`},
+                {transform: `translate(1px, 1px)`},
+                {transform: `translate(0px, 0px)`},
+            ];
+            console.log("keyframes", keyframes);
+            this.arrowElement?.animate(keyframes,{
+                duration: 200,
+                easing: "ease-in-out",
+            });
             return;
         } else {
             this.arrowElement?.classList.remove("collided");
             this.collisionElement?.remove();
             this.collisionElement = null;
-            gridPath.RemoveArrow(this);
+            Main.gridPath.RemoveArrow(this);
             this.AnimateArrowExit(ray);
-            gridPath.DeleteArrow(this);
+            Main.gridPath.DeleteArrow(this);
         }
         return;
         
@@ -652,7 +834,30 @@ class Cell {
     private idstr: string;
     private arrow: Arrow | null;
     private rank: number = 0;
-    
+    private previousRank: number = 0;
+
+    public flags = {
+        blocked: false,
+        headLeft: true,
+        headRight: true,
+        headUp: true,
+        headDown: true,
+        bodyLeft: true,
+        bodyRight: true,
+        bodyUp: true,
+        bodyDown: true,
+
+    };
+    // head left
+    // head right
+    // head up
+    // head down
+    // body left
+    // body right
+    // body up
+    // body down
+    // empty
+    // blocked
 
     element: SVGGElement | null = null;
     squareElement: SVGRectElement | null = null;
@@ -667,8 +872,12 @@ class Cell {
         return this.rank;
     }
     public set Rank(rank: number){
+        this.previousRank = this.rank;
         this.rank = rank;
         this.TextElement;
+    }
+    public get PreviousRank(): number{
+        return this.previousRank;
     }
     get Id(){
         return this.id;
@@ -699,13 +908,14 @@ class Cell {
         element.appendChild(rect);
         element.appendChild(this.TextElement);
 
-        if(gridGroup) gridGroup.appendChild(element);
+        if(Main.gridGroup) Main.gridGroup.appendChild(element);
         return element;
     }
     private get TextElement(): SVGTextElement{
         if(this.textElement){
             this.textElement.textContent = this.Rank == 0?"":this.Rank.toString();
             this.textElement.setAttribute("fill", `rgb(${Math.round(this.Rank/props.maxRank*255)},${Math.round(this.Rank/props.maxRank*255)},255)`);
+            
             return this.textElement;
         }
         this.textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -719,11 +929,15 @@ class Cell {
         this.textElement.textContent = this.Rank == 0?"":this.Rank.toString();
         return this.textElement;
     }
-    invalidate(){
-        this.Rank = 0;
+    public RevertRank(){
+        this.rank = this.previousRank;
         this.TextElement;
-        this.squareElement?.setAttribute("fill", "red");
     }
+    // invalidate(){
+    //     this.Rank = 0;
+    //     this.TextElement;
+    //     this.squareElement?.setAttribute("fill", "red");
+    // }
     fillColor(color: string){
         this.squareElement?.setAttribute("fill", color);
     }
