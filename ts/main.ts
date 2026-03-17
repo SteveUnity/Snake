@@ -68,28 +68,182 @@ namespace Main {
         return new Promise(resolve => setTimeout(resolve, ms));
         // return Promise.resolve();
     }
-
-    async function GenerateMap() {
-        // place the starting arrow
-        // console.log("placeStartingArrow start");
-        // let arrow = await placeStartingArrow();
-        let cell = gridPath.getEmptyCellWithRank();
-        let counter = 0;
-        debugger;
-        while (cell && counter < 100) {
-            counter++;
-            let region = gridPath.getEmptyRegion(cell);
-            console.log("region", region);
-            let arrow = await PlaceArrowForRegion(region);
-            if (arrow) {
-                counter = 0;
+    function isValidDirection(ray: Cell[], direction: Direction): boolean {
+        return !ray.some(c=>c.Arrow && c.Arrow.Direction == (direction+2)%4);
+    }
+    function getBody(cell: Cell, nextCell: Cell, ray: Cell[]): Cell[] {
+        let body: Cell[] = [cell, nextCell];
+        let holdRayCells = [];
+        for(const cell of ray){
+            if(!cell.Arrow && cell.Rank >=0) {
+                cell.Rank = -2;
+                holdRayCells.push(cell);
             }
-            cell = gridPath.getEmptyCellWithRank();
+        }
+        let currCell = nextCell;
+        cell.Rank = -2;
+        nextCell.Rank = -2;
+        holdRayCells.push(cell, nextCell);
+        while(currCell && body.length < props.maxLength){
+            let nextCell = gridPath.findNextEmptyCell(currCell);
+            if(!nextCell) break;
+            if(nextCell.cell.Rank >=0) nextCell.cell.Rank = -2;
+            holdRayCells.push(nextCell.cell);
+            body.push(nextCell.cell);
+            currCell = nextCell.cell;
+        }
+        if(body.length == 1){
+            body[0].Rank = -1;
+            if(body[0].textElement) body[0].textElement.style.fill = "white";
+            if(body[0].squareElement) body[0].squareElement.style.fill = "firebrick";
+            body = [];
+        }
+        for(const cell of holdRayCells){
+            cell.RevertRank();
+        }
+        return body;
+
+    }
+    function generateArrow(cell:Cell,nextCell: Cell,dir:Direction,baseRank: number = 10): Arrow | null {
+        let ray = gridPath.getCellRay(cell, dir as Direction);
+        ray.forEach(c=>c.fillColor("lightgreen"));
+        if(ray.some(c=>c.Arrow && c.Arrow.Direction == (dir+2)%4)){
+            ray.forEach(c=>c.fillColor("none"));
+            return null;
+        }
+        
+        let body = getBody(cell, nextCell, ray);
+        if(body.length == 0) return null;
+        body.forEach(c=>c.fillColor("darkorange"));
+        let maxRank = body.reduce((max, cell) => Math.max(max, cell.Rank), baseRank);
+        if(ray.some(c=>c.Arrow && c.Rank <= maxRank)) return null;
+        // arrow is valid
+        let arrow = new Arrow([...cell.Id], dir as Direction, maxRank);        
+        for (const cell of body) {
+            cell.Rank = maxRank; 
+            cell.Arrow = arrow;
+            arrow.AddPoint([...cell.Id]);
+        }
+        let [arrowElement, collisionElement] = arrow.GetArrowElement();
+        arrowGroup?.appendChild(collisionElement);
+        arrowGroup?.appendChild(arrowElement);
+        gridPath.AddArrow(arrow);
+        for(const cell of ray){
+            if(!cell.Arrow) cell.Rank = maxRank+1;
+        }
+        return arrow;
+    }
+    async function GenerateMap() {
+        let arrowsCreated = 0;
+        // get all empty cells
+        let cells = gridPath.GetAllCells();
+        cells.sort(()=>Rand()*2-1);
+        let count = cells.length*2;
+        let dirs = [0,1,2,3].sort(()=>Rand()*2-1);
+
+        for (let i = 0; i < count && cells.length > 0; i++) {
+            const cell = cells.pop() as Cell;
+            if(!cell) break;
+            
+            // debugger;
+    
+            let arrow: Arrow | null = null;
+            if(Rand()>props.straightness)
+                dirs.sort(()=>Rand()*2-1);
+            for(let dir of dirs){
+                let nextCell = gridPath.findNextEmptyCell(cell,(dir+2)%4 as Direction);
+                if(!nextCell) continue;
+                dir = (nextCell.direction+2)%4 as Direction;
+                cell.fillColor("blue");
+                nextCell.cell.fillColor("lightblue");
+                arrow = generateArrow(cell, nextCell.cell, dir, 10);
+                gridPath.GetAllCells().forEach(cell=>cell.fillColor("none"));
+                if(arrow) {
+                    arrowsCreated++;
+                    break;
+                }
+            }
+            cells = cells.filter(cell=>cell.Arrow == null && cell.Rank >=0);
+        }
+        gridPath.GetAllCells().forEach(cell=>cell.fillColor("none"));
+        console.log("arrowsCreated", arrowsCreated);
+        // fill empty regions
+        cells = gridPath.GetEmptyCells();
+        const regions = [];
+        while(cells.length > 0) {
+            let cell = cells.pop() as Cell;
+            cell = gridPath.Grid[(cell as any).id[0]][(cell as any).id[1]];
+            if(!cell) continue;
+            let region = gridPath.getEmptyRegion(cell);
+            if(region.region.length == 1){
+                cell.Rank = -1;
+                if (cell.textElement) cell.textElement.style.fill = "white";
+                if (cell.squareElement) cell.squareElement.style.fill = "firebrick";
+                continue;
+            }
+            regions.push(region);
+            for (const cell of region.region) {
+                if(cells.includes(cell)) {
+                    cells.splice(cells.indexOf(cell), 1);
+                }
+            }
+        }
+        for (const region of regions) {
+            cells = [...region.region.sort(()=>Rand()*2-1),...region.edge.sort(()=>Rand()*2-1)];
+            while(cells.length > 0) {
+                let cell = cells.pop() as Cell;
+                let nextCell = gridPath.findNextEmptyCell(cell);
+                if(!nextCell) {
+                    err("SOMETHING IS WRONG! No next cell found for cell", cell);
+                    continue;
+                }
+                let dir = (nextCell.direction+2)%4 as Direction;
+                cell.fillColor("blue");
+                nextCell.cell.fillColor("lightblue");
+                let arrow = generateArrow(cell, nextCell.cell, dir, 1);
+                gridPath.GetAllCells().forEach(cell=>cell.fillColor("none"));
+                if(arrow) {
+                    arrowsCreated++;
+                    break;
+                }
+            }
+            // if (arrow) {
+            //     arrowsCreated++;
+            // } else {
+            //     err("No arrow found! Failed to generate arrow for region", region);
+            //     region.region.forEach(cell => {
+            //         cell.Rank = -1;
+            //         if (cell.textElement) cell.textElement.style.fill = "white";
+            //         if (cell.squareElement) cell.squareElement.style.fill = "purple";
+            //     });
+            // }
         }
 
+        // let cell = gridPath.getEmptyCellByRank(0);
+        // let counter = 0;
+        // arrowsCreated = 0;
+        // while (cell && counter < 100) {
+        //     counter++;
+        //     let region = gridPath.getEmptyRegion(cell);
+        //     console.log("region", region);
+        //     let arrow = await PlaceArrowForRegion(region);
+        //     if (arrow) {
+        //         counter = 0;
+        //         arrowsCreated++;
+        //     } else {
+        //         region.region.forEach(cell => {
+        //             cell.Rank = -1;
+        //             if (cell.textElement) cell.textElement.style.fill = "white";
+        //             if (cell.squareElement) cell.squareElement.style.fill = "purple";
+        //         });
+        //     }
+        //     cell = gridPath.getEmptyCellWithRank();
+        // }
+        console.log("arrowsCreated from regions", arrowsCreated);
 
     }
     async function PlaceArrowForRegion(region: { region: Cell[], edge: Cell[] }) {
+
         if (region.region.length == 1) {
             let cell = region.region[0];
             cell.Rank = -1;
@@ -106,7 +260,7 @@ namespace Main {
             let cell = region.edge.pop() as Cell;
             let arrow = await placeArrow(cell, 1);
             if (!arrow) {
-                console.warn("No arrow found! Failed to generate arrow for region", cell, region);
+                // console.warn("No arrow found! Failed to generate arrow for region", cell, region);
                 continue;
             }
             else {
@@ -119,7 +273,7 @@ namespace Main {
             let cell = region.region.pop() as Cell;
             let arrow = await placeArrow(cell, 1);
             if (!arrow) {
-                console.warn("No arrow found! Failed to generate arrow for region", cell, region);
+                // console.warn("No arrow found! Failed to generate arrow for region", cell, region);
                 continue;
             }
             else {
@@ -140,7 +294,7 @@ namespace Main {
     }
 
     // let arrows: SVGPathElement[] = [];
-    async function draw() {
+    export async function draw() {
 
         if (!arrowGroup) {
             arrowGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -204,7 +358,7 @@ namespace Main {
             cell = gridPath.getEmptyCellWithRank();
         }
     }
-    draw();
+    
     export function restart() {
         [...rootGroup.children].forEach(child => child.remove());
         rngSeed = (document.getElementById("level") as HTMLInputElement)?.valueAsNumber ?? 1;
@@ -422,3 +576,6 @@ Main.svg?.addEventListener("pointerleave", pointerUpHandler, {
 //             break;
 //     }
 // });
+window.addEventListener('load', () => {
+    Main.draw();
+});

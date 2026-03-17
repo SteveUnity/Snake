@@ -88,6 +88,9 @@ class GridPath{
     public GetAllCells(): Cell[]{
         return this.grid.flat();
     }
+    public GetEmptyCells(): Cell[]{
+        return this.grid.flat().filter(cell=>cell.Arrow == null && cell.Rank >=0);
+    }
     public GetRandomEmptyCell(): Cell|null{
         let cells = this.grid.flat().filter(cell=>cell.Arrow == null && cell.Rank == 0);
         if(cells.length === 0){
@@ -97,7 +100,7 @@ class GridPath{
     }
 
     public getEmptyCellWithRank(): Cell|null{
-        let cells = this.grid.flat().filter(cell=>cell.Rank >= 0 && cell.Arrow == null);
+        let cells = this.grid.flat().filter(cell=>cell.Rank > 0 && cell.Arrow == null);
         if(cells.length === 0){
             return null;
         }
@@ -111,12 +114,15 @@ class GridPath{
         return cells[Math.floor(Rand() * cells.length)];
     }
     private lastDirection: Direction|null = null;
-    private findNextEmptyCell(prev:Cell,prefDir: Direction|null): {direction: Direction, cell: Cell} | null {
-        if(prefDir == null) prefDir = Math.floor(Rand() * 4) as Direction;
+    public findNextEmptyCell(prev:Cell,prefDir?: Direction): {direction: Direction, cell: Cell} | null {
+        if(!prefDir) prefDir = Math.floor(Rand() * 4) as Direction;
         let x = prev.Id[0];
         let y = prev.Id[1];
-        for (let i = 0; i < 4; i++) {
-            let direction = (prefDir + i) % 4;
+        let directions = [Direction.UP, Direction.RIGHT, Direction.DOWN, Direction.LEFT].sort(()=>Rand()*2-1);
+        directions.splice(directions.indexOf(prefDir),1);
+        directions.push(prefDir);
+        directions.reverse();
+        for (const direction of directions) {
             let cell:Cell;
             switch (direction) {
                 case Direction.UP:
@@ -135,7 +141,7 @@ class GridPath{
                     cell = this.grid[x]?.[y+1];
                     break;
             }
-            if(cell && cell.Arrow == null){
+            if(cell && cell.Arrow == null && cell.Rank >=0){
                 return {direction, cell};
             }
         }
@@ -330,7 +336,7 @@ class GridPath{
         // mark all empty ray cells as ranking one higher than the arrow
         if(!ray) ray = this.getArrowHeadRay(arrow);
         for (let i = 2; i < length; i++) {
-            nextCell = this.findNextEmptyCell(nextCell.cell,null);
+            nextCell = this.findNextEmptyCell(nextCell.cell);
             if(nextCell == null || ray.includes(nextCell.cell)){
                 break;
             }
@@ -348,13 +354,13 @@ class GridPath{
                 if(cell.Arrow == null){
                     cell.Rank = arrow.Rank+1;
                 } else {
+                    err("Arrow blocked by another arrow after recalculating rank",{newRank: arrow.Rank,blocker: cell.Rank});
                     for(const cell of Cells){
                         cell.Arrow = null;
                     }
                     for(const cell of ray){
                         cell.RevertRank();
                     }
-                    err("Arrow blocked by another arrow after recalculating rank",{newRank: arrow.Rank,blocker: cell.Rank});
                     return null;
                 }
             }
@@ -396,7 +402,38 @@ class GridPath{
         }
         
     }
-
+    public getCellRay(cell: Cell, direction: Direction):Cell[]{
+        let cells:Cell[] = [];
+        let x = cell.Id[0];
+        let y = cell.Id[1];
+        switch(direction){
+            case Direction.UP:
+                y--;
+                for(let i = y; i >= 0; i--){
+                    cells.push(this.grid[x][i]);
+                }
+                return cells;
+            case Direction.RIGHT:
+                x++;
+                for(let i = x; i < props.width; i++){
+                    cells.push(this.grid[i][y]);
+                }
+                return cells;
+            case Direction.DOWN:
+                y++;
+                for(let i = y; i < props.height; i++){
+                    cells.push(this.grid[x][i]);
+                }
+                return cells;
+            case Direction.LEFT:
+                x--;
+                for(let i = x; i >= 0; i--){
+                    cells.push(this.grid[i][y]);
+                }
+                return cells;
+        }
+        return cells;
+    }
     public getArrowHeadRay(arrow: Arrow):Cell[]{
         let direction = (arrow.Direction+2)%4;
         let x = arrow.TailCell[0];
@@ -548,7 +585,7 @@ class Arrow{
     }
     GetArrowElement(): [SVGPathElement, SVGPathElement]{
         if(this.arrowElement && this.collisionElement) return [this.arrowElement, this.collisionElement];
-        let d = this.stringifyBreakPointsToPath(this.path.reverse());
+        let d = this.stringifyBreakPointsToPath(this.path);
         const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
         arrow.setAttribute("d", d);
         arrow.classList.add("arrowElement");
@@ -800,6 +837,15 @@ class Arrow{
         }
         let d = "";
         breakPoints = JSON.parse(JSON.stringify(breakPoints));
+        if(breakPoints.length > 2){
+            for (let i = 0; i < breakPoints.length-2; i++) {
+                let bp0 = breakPoints[i],bp1 = breakPoints[i+1],bp2 = breakPoints[i+2];
+                if(bp0[0] == bp1[0] && bp1[0] == bp2[0] || bp0[1] == bp1[1] && bp1[1] == bp2[1]){
+                    breakPoints.splice(i+1,1);
+                    i--;
+                }
+            }
+        }
         for (const element of breakPoints) {
             element[0] = element[0] + 0.5;
             element[1] = element[1] + 0.5;
