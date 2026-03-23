@@ -10,6 +10,7 @@ const props:{
     offset: number;
     radius: number;
     seedShift: number;
+    animationSpeed: number;
 } =JSON.parse(localStorage.getItem("props")??  `{
     "level" : 1,
     "width" : 20,
@@ -24,6 +25,7 @@ props.scale = 20;
 props.offset = 0;
 props.radius = 4;
 props.seedShift = 4885;
+props.animationSpeed = 0.2;
 (<HTMLInputElement>document.getElementById("level")).value = props.level.toString();
 (<HTMLInputElement>document.getElementById("width")).value = props.width.toString();
 (<HTMLInputElement>document.getElementById("height")).value = props.height.toString();
@@ -68,6 +70,9 @@ class GridPath{
             // this.grid.push(new Array(this.height).fill(null));
         }
     }
+    public get Arrows(){
+        return [...this.arrows.values()];
+    }
     
     public DeleteArrow(arrow: Arrow){
         this.arrows.delete(arrow.Id.toString());
@@ -84,7 +89,15 @@ class GridPath{
     public get Grid(){
         return this.grid;
     }
-    
+    public GetCell(x: [number, number]): Cell|null
+    public GetCell(x: number, y: number): Cell|null
+    public GetCell(x: number|[number, number], y?: number): Cell|null{
+        if(typeof x === "number"){
+            if(y == null) return null;
+            return this.grid[x][y];
+        }
+        return this.grid[x[0]][x[1]];
+    }
     public GetAllCells(): Cell[]{
         return this.grid.flat();
     }
@@ -190,6 +203,52 @@ class GridPath{
             direction = (direction + 1) % 4;
         } while(failedCounter < 4)
         return null;
+    }
+    public getCellsByPositionRank(cell: Cell): {[index:number]:Cell[]} {
+        // find next empty cell in a circle
+        let cellsRanks: {[index:number]:Cell[]} = {0:[cell]}; 
+        // fix w to min,max and itterate h from min to max
+        // then fix h to min,max and itterate w from min to max
+        // if rank is x then min is cell.id[0]-x and max is cell.id[0]+x
+        let rank = 0;
+        let added = true;
+        while(added){
+            added = false;
+            rank++;
+            const cells:Cell[] = [];
+            const min=cell.Id[0]-rank;
+            const max=cell.Id[0]+rank;
+            for(let w = min; w <= max; w++){
+                let cell = this.grid[w]?.[min];
+                if(cell){
+                    added = true;
+                    cells.push(cell);
+                }
+            }
+            for(let w = min; w <= max; w++){
+                let cell = this.grid[w]?.[max];
+                if(cell){
+                    added = true;
+                    cells.push(cell);
+                }
+            }
+            for(let h = min+1; h <= max-1; h++){
+                let cell = this.grid[min]?.[h];
+                if(cell){
+                    added = true;
+                    cells.push(cell);
+                }
+            }
+            for(let h = min+1; h <= max-1; h++){
+                let cell = this.grid[max]?.[h];
+                if(cell){
+                    added = true;
+                    cells.push(cell);
+                }
+            }
+            cellsRanks[rank] = cells//.sort(()=>Rand()*2-1);
+        }
+        return cellsRanks;
     }
     public getPeremeterCellsCercular(index: number): Cell[]{
         let perimeterCells =[...this.grid.flat().filter(cell=>{
@@ -435,9 +494,9 @@ class GridPath{
         return cells;
     }
     public getArrowHeadRay(arrow: Arrow):Cell[]{
-        let direction = (arrow.Direction+2)%4;
-        let x = arrow.TailCell[0];
-        let y = arrow.TailCell[1];
+        let direction = arrow.Direction;
+        let x = arrow.HeadCell[0];
+        let y = arrow.HeadCell[1];
         let cells:Cell[] = [];
         // console.log("getArrowHeadRay", Direction[direction]);
         switch(direction){
@@ -522,6 +581,7 @@ class GridPath{
         }
         return arrows.length === 0;
     }
+
 }
 enum Direction{
     UP = 0,
@@ -539,13 +599,16 @@ class Arrow{
     private collisionElement: SVGPathElement|null = null;
     private animationStartTime: number = 0;
     private animationSpeed = 150;
+    private pathTotalLength: number = 0;
     constructor(id: [number, number],direction: Direction, rank: number){
         this.id = id;
         this.direction = direction;
         this.rank = rank;
         this.path.push([...this.id]);
     }
-    
+    get Length(){
+        return this.path.length;
+    }
     get Path(){
         return [...this.path];
     }
@@ -576,6 +639,9 @@ class Arrow{
     }
     AddPoint(point: [number, number]){
         this.path.push(point);
+    }
+    PrependPoint(point: [number, number]){
+        this.path.unshift(point);
     }
     GetPoints(): [number, number][]{
         return [...this.path];
@@ -622,6 +688,12 @@ class Arrow{
         collisionElement.addEventListener("contextmenu", (e) => {
             e.preventDefault();
             Main.validateRay(this);
+            let ray = Main.gridPath.getArrowHeadRay(this);
+            for(let i=0;i<ray.length;i++){
+                if(ray[i].Arrow) break;
+                this.PrependPoint(ray[i].Id);
+                ray[i].Arrow = this;
+            }
         });
         this.collisionElement = collisionElement;
         return [arrow,collisionElement];
@@ -656,12 +728,16 @@ class Arrow{
             });
             return;
         } else {
+            this.pathTotalLength = this.arrowElement?.getTotalLength() ?? 0;
             this.arrowElement?.classList.remove("collided");
             this.collisionElement?.remove();
             this.collisionElement = null;
             Main.gridPath.RemoveArrow(this);
-            this.AnimateArrowExit(ray);
-            Main.gridPath.DeleteArrow(this);
+            // this.AnimateArrowExit(ray);
+            this.AnimateArrowExit_new().then(() => {
+                Main.gridPath.DeleteArrow(this);
+                err("Arrow Exited and Deleted",{arrow: this});
+            });
         }
         return;
         
@@ -732,8 +808,74 @@ class Arrow{
         }
         
     }
+    AnimateArrowExit_new(): Promise<boolean>{
+        let forward: [number, number] = [(this.path[0][0]-this.path[1][0]),(this.path[0][1]-this.path[1][1])];
+        log("AnimateArrowExit_new",{forward,0:this.path[0],1:this.path[1],arrow:this.path});
+        function animateHead(head: [number, number],forward: [number, number],duration: number){
+            head[0] += forward[0] * (duration/props.scale)*props.animationSpeed;
+            head[1] += forward[1] * (duration/props.scale)*props.animationSpeed;
+            return head;
+        }
+        function animateTail(arrow: Arrow,duration: number): boolean{
+            const elem = arrow.arrowElement;
+            if(!elem) return false;
+            let length = elem.getTotalLength();
+            if(!length) return false;
+            let strokeDasharray = length;
+            let strokeDashoffset =  (duration*props.animationSpeed);
+            elem.style.strokeDasharray = `${strokeDasharray}`;
+            elem.style.strokeDashoffset = `${strokeDashoffset}`;
+            if(strokeDashoffset>(arrow.pathTotalLength+props.scale*2)){
+                return true; // stop the animation
+            }
+            return false;
+        }
+        const startTime = performance.now();
+        let promise = new Promise((resolve, reject) => {
+            let interval = setInterval(() => {
+                let duration = performance.now() - startTime;
+                const adjustedDuration = duration**2.3*0.0003;
+                console.log({duration,adjustedDuration});
+                let newHead = animateHead([...this.path[0]],forward,adjustedDuration);
+                let d = this.stringifyBreakPointsToPath([newHead,...this.path.slice(1)]);
+                this.arrowElement?.setAttribute("d", d);
+                animateTail(this,adjustedDuration);
+                let exitedView = false;
+                // if head position + forward * length bigger than viewport, 
+                // then the arrow is outside view and should be removed.
+                // there is offset applied
+                const tX = (Main.rootGroup as any).dataTX;
+                const tY = (Main.rootGroup as any).dataTY;
+                newHead[0] = (newHead[0] * props.scale) + tX - (this.pathTotalLength+50 * forward[0]);
+                newHead[1] = (newHead[1] * props.scale) + tY - (this.pathTotalLength+50 * forward[1]);
+                
+                if(forward[0]+forward[1]>0){
+                    // moving positive direction
+                    if(newHead[0]>window.innerWidth || newHead[1]>window.innerHeight){
+                        console.log("exitedView", newHead);
+                        exitedView = true;
+                    }
+                } else if((newHead[0]<0 || newHead[1]<0)){
+                    console.log("exitedView negative", newHead);
+                    // moving negative direction
+                    exitedView = true;
+                }
+
+
+                if(exitedView){
+                    clearInterval(interval);
+                    this.arrowElement?.remove();
+                    this.arrowElement = null;
+                    resolve(true);
+                }
+                // if tail is outside the viewport, remove the arrow and stop the animation
+            }, 1);
+
+        })
+        return promise as Promise<boolean>;
+    }
     AnimateArrowExit(ray: Cell[]){
-        ray.reverse();
+        // ray.reverse();
         this.AnimateArrowExitSection(ray);
     }
     AnimateArrowExitSection(ray: Cell[]){
@@ -744,9 +886,8 @@ class Arrow{
         // console.log("AnimateArrowExitSection", ray);
         let lastCell = ray.pop();
         if(!lastCell) return;
-        const newPath = [...this.path];
-        newPath.shift();
-        newPath.push(lastCell.Id);
+        const newPath = [lastCell.Id,...this.path];
+        newPath.pop();
         // this.arrowElement?.setAttribute('d', this.stringifyBreakPointsToPath(newPath));
         // return;
         this.arrowElement?.setAttribute('data-animate-to', JSON.stringify(newPath));
@@ -759,6 +900,7 @@ class Arrow{
     }
     exitCounter=0;
     AnimateArrowExitOutofview(){
+        return;
         this.exitCounter++;
         if(this.exitCounter > 100) {
             this.arrowElement?.remove();
@@ -768,25 +910,25 @@ class Arrow{
             return;
         }
 
-        let lastCell = this.path[this.path.length-1];
-        lastCell = [...lastCell];
+        let firstCell = this.path[0];
+        firstCell = [...firstCell];
         switch(this.direction){
             case Direction.UP:
-                lastCell[1]+=1;
+                firstCell[1]-=1;
                 break;
             case Direction.LEFT:
-                lastCell[0]+=1;
+                firstCell[0]-=1;
                 break;
             case Direction.DOWN:
-                lastCell[1]-=1;
+                firstCell[1]+=1;
                 break;
             case Direction.RIGHT:
-                lastCell[0]-=1;
+                firstCell[0]+=1;
                 break;
         }
-        const newPath = [...this.path];
-        newPath.shift();
-        newPath.push(lastCell);
+        const newPath = [firstCell,...this.path];
+        newPath.pop();
+        // newPath.push(firstCell);
         // this.arrowElement?.setAttribute('d', this.stringifyBreakPointsToPath(newPath));
         // return;
         this.arrowElement?.setAttribute('data-animate-to', JSON.stringify(newPath));

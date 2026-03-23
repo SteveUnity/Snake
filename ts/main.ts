@@ -50,7 +50,7 @@ namespace Main {
 
     const DELAY_TIME = 100;
     export const svg = document.getElementById("svg");
-    let rootGroup: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    export let rootGroup: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg", "g");
     rootGroup.classList.add("rootGroup");
     export let gridGroup: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg", "g");
     gridGroup.classList.add("gridGroup");
@@ -118,26 +118,26 @@ namespace Main {
         let maxRank = body.reduce((max, cell) => Math.max(max, cell.Rank), baseRank);
         if(ray.some(c=>c.Arrow && c.Rank <= maxRank)) return null;
         // arrow is valid
-        let arrow = new Arrow([...cell.Id], dir as Direction, maxRank);        
+        let arrow = new Arrow([...cell.Id], dir as Direction, maxRank);   
+        // log("arrow body",body);
+        // log("arrow empty",arrow.Path);
+        const firstCell = body.shift() as Cell;
+        firstCell.Rank = maxRank;
+        firstCell.Arrow = arrow;
         for (const cell of body) {
             cell.Rank = maxRank; 
             cell.Arrow = arrow;
             arrow.AddPoint([...cell.Id]);
         }
-        let [arrowElement, collisionElement] = arrow.GetArrowElement();
-        arrowGroup?.appendChild(collisionElement);
-        arrowGroup?.appendChild(arrowElement);
+        // log("arrow full",arrow.Path);
         gridPath.AddArrow(arrow);
         for(const cell of ray){
             if(!cell.Arrow) cell.Rank = maxRank+1;
         }
         return arrow;
     }
-    async function GenerateMap() {
-        let arrowsCreated = 0;
-        // get all empty cells
-        let cells = gridPath.GetAllCells();
-        cells.sort(()=>Rand()*2-1);
+    function GenerateArrowsFromCells(cells: Cell[]): Arrow[] {
+        const arrows:Arrow[] = [];
         let count = cells.length*2;
         let dirs = [0,1,2,3].sort(()=>Rand()*2-1);
 
@@ -159,14 +159,22 @@ namespace Main {
                 arrow = generateArrow(cell, nextCell.cell, dir, 10);
                 gridPath.GetAllCells().forEach(cell=>cell.fillColor("none"));
                 if(arrow) {
-                    arrowsCreated++;
+                    arrows.push(arrow);
+                    log("arrow generated",arrow);
                     break;
                 }
             }
             cells = cells.filter(cell=>cell.Arrow == null && cell.Rank >=0);
         }
         gridPath.GetAllCells().forEach(cell=>cell.fillColor("none"));
-        console.log("arrowsCreated", arrowsCreated);
+        return arrows;
+    }
+    async function GenerateMap() {
+        let arrowsCreated = 0;
+        // get all empty cells
+        let cells = gridPath.GetAllCells();
+        cells.sort(()=>Rand()*2-1);
+        const arrows = GenerateArrowsFromCells(cells);
         // fill empty regions
         cells = gridPath.GetEmptyCells();
         const regions = [];
@@ -203,7 +211,6 @@ namespace Main {
                 let arrow = generateArrow(cell, nextCell.cell, dir, 1);
                 gridPath.GetAllCells().forEach(cell=>cell.fillColor("none"));
                 if(arrow) {
-                    arrowsCreated++;
                     break;
                 }
             }
@@ -241,6 +248,93 @@ namespace Main {
         // }
         console.log("arrowsCreated from regions", arrowsCreated);
 
+    }
+    function mergeArrowAhead(arrow: Arrow): {cell1:Cell, cell2:Cell} | null{
+        let ray = gridPath.getArrowHeadRay(arrow);
+            
+            // if arrow immediately ahead is length less than 3, merge them
+        let nextarrow = ray.find(cell=>cell.Arrow && cell.Arrow.Length<3 && cell.Arrow.Direction == arrow.Direction) as Cell;
+        
+        for(let i=0;i<ray.length;i++){
+            if(ray[i].Arrow) break;
+            arrow.PrependPoint(ray[i].Id);
+            ray[i].Arrow = arrow;
+        }
+        if(arrow.Length<3){
+            arrow.Color = "red";
+        }
+        if(nextarrow){
+            return {cell1:gridPath.Grid[arrow.HeadCell[0]][arrow.HeadCell[1]], cell2:gridPath.Grid[(nextarrow.Arrow as Arrow).HeadCell[0]][(nextarrow.Arrow as Arrow).HeadCell[1]]};
+        }
+        return null;
+    }
+    function mergeArrowBehind(arrow:Arrow){
+        let mergePot = [];
+        let tail = arrow.TailCell;
+        for (let d = -2; d < 2; d++) {
+            let i = 1;
+            let dir = [((d+1)%2)+tail[0],d%2+tail[1]];
+            const nextCell = gridPath.Grid[dir[0]*i][dir[1]*i];
+            while(nextCell && i<10){
+                // if(nextCell.Arrow
+
+            }
+
+        }
+
+    }
+    function extendToEmptyCellAtTail(){}
+    async function GenerateMapSpiral(){
+        let centralCell = gridPath.Grid[Math.floor(props.width/2)][Math.floor(props.height/2)];
+        if(!centralCell) return;
+        let allCells = gridPath.getCellsByPositionRank(centralCell);
+        let arrows = [];
+        for(let rank in Object.keys(allCells)){
+            const cells = allCells[rank];
+            // log("rank", rank, cells);
+            let arrs = GenerateArrowsFromCells(cells);
+            arrows.push(...arrs);
+        }
+        let maxLength = arrows.reduce((max, arrow) => Math.max(max, arrow.Length), 0);
+        console.log("maxLength", maxLength);
+        let mergeArrows:{cell1:Cell, cell2:Cell}[] = [];
+        arrows.forEach(arrow=>{
+            // if arrow immediately ahead is length less than 3, merge them
+            const nextarrow = mergeArrowAhead(arrow);
+            if(nextarrow){
+                mergeArrows.push(nextarrow);
+            }
+        });
+        mergeArrows.forEach(merge=>{
+            let firstArrow = merge.cell1.Arrow as Arrow;
+            let secondArrow = merge.cell2.Arrow as Arrow;
+            if(firstArrow === secondArrow) return;
+            firstArrow.Path.forEach(point=>{
+                secondArrow.AddPoint(point);
+                gridPath.Grid[point[0]][point[1]].Arrow = secondArrow;
+            });
+            gridPath.DeleteArrow(firstArrow);
+        });
+        gridPath.Arrows.forEach(arrow=>{
+            let [arrowElement, collisionElement] = arrow.GetArrowElement();
+            arrowGroup?.appendChild(collisionElement);
+            arrowGroup?.appendChild(arrowElement);
+        });
+        for(let cell of gridPath.GetAllCells()){
+            let parent = cell.squareElement?.parentElement;
+            if(!parent) continue;
+            parent.innerHTML = '';
+            if(!cell.Arrow) continue;
+            const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            dot.setAttribute("cx", props.scale/2+'');
+            dot.setAttribute("cy", props.scale/2+'');
+            dot.setAttribute("r", "3");
+            dot.setAttribute("fill", "white");
+            parent.appendChild(dot);
+            dot.addEventListener("click", ()=>{
+                console.log("click", cell.Arrow?.Path.map(c=>gridPath.GetCell(c)?.element));
+            });
+        }
     }
     async function PlaceArrowForRegion(region: { region: Cell[], edge: Cell[] }) {
 
@@ -303,7 +397,8 @@ namespace Main {
             arrowGroup.innerHTML = "";
         }
         rootGroup.appendChild(arrowGroup);
-        await GenerateMap();
+        // await GenerateMap();
+        await GenerateMapSpiral();
 
         centersvg();
 
@@ -469,15 +564,16 @@ namespace Main {
         }
     }
     export const mouseUpEvent = (clientX: number, clientY: number) => {
+        console.log("mouseUpEvent", clientX, clientY);
         if (dragging) {
 
             let tX = (rootGroup as any).dataTX ?? 0;
             let tY = (rootGroup as any).dataTY ?? 0;
             (rootGroup as any).dataTX = tX + clientX - dragX;
             (rootGroup as any).dataTY = tY + clientY - dragY;
+            mouseUpBlocked = (Math.abs(clientX - dragX) + Math.abs(clientY - dragY) > 5);
             dragX = clientX;
             dragY = clientY;
-            mouseUpBlocked = (Math.abs(clientX - dragX) + Math.abs(clientY - dragY) <= 5);
         }
         dragging = false;
     }
