@@ -251,18 +251,22 @@ namespace Main {
     }
     function mergeArrowAhead(arrow: Arrow): {cell1:Cell, cell2:Cell} | null{
         let ray = gridPath.getArrowHeadRay(arrow);
-            
+        let nextarrow: Cell | null = null;
             // if arrow immediately ahead is length less than 3, merge them
-        let nextarrow = ray.find(cell=>cell.Arrow && cell.Arrow.Length<3 && cell.Arrow.Direction == arrow.Direction) as Cell;
-        
-        for(let i=0;i<ray.length;i++){
-            if(ray[i].Arrow) break;
-            arrow.PrependPoint(ray[i].Id);
-            ray[i].Arrow = arrow;
-        }
-        if(arrow.Length<3){
-            arrow.Color = "red";
-        }
+            for(const cell of ray){
+                if(!cell.Arrow) {
+                    // next cell is empty, extend arrow to it
+                    //! is this going to create deadlocks?
+                    arrow.PrependPoint(cell.Id);
+                    cell.Arrow = arrow;
+                    continue;
+                }
+                if(cell.Arrow && cell.Arrow.Direction == arrow.Direction && ray.includes(gridPath.GetCell(cell.Arrow.HeadCell) as Cell)){
+                    // ahead arrow is 2 cell arrow, merge them
+                    nextarrow = cell;
+                    break;
+                }
+            }
         if(nextarrow){
             return {cell1:gridPath.Grid[arrow.HeadCell[0]][arrow.HeadCell[1]], cell2:gridPath.Grid[(nextarrow.Arrow as Arrow).HeadCell[0]][(nextarrow.Arrow as Arrow).HeadCell[1]]};
         }
