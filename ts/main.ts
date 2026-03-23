@@ -139,7 +139,7 @@ namespace Main {
     function GenerateArrowsFromCells(cells: Cell[]): Arrow[] {
         const arrows:Arrow[] = [];
         let count = cells.length*2;
-        let dirs = [0,1,2,3].sort(()=>Rand()*2-1);
+        let dirs = [0,1,2,3]//.sort(()=>Rand()*2-1);
 
         for (let i = 0; i < count && cells.length > 0; i++) {
             const cell = cells.pop() as Cell;
@@ -148,8 +148,8 @@ namespace Main {
             // debugger;
     
             let arrow: Arrow | null = null;
-            if(Rand()>props.straightness)
-                dirs.sort(()=>Rand()*2-1);
+            // if(Rand()>props.straightness)
+            //     dirs.sort(()=>Rand()*2-1);
             for(let dir of dirs){
                 let nextCell = gridPath.findNextEmptyCell(cell,(dir+2)%4 as Direction);
                 if(!nextCell) continue;
@@ -261,9 +261,11 @@ namespace Main {
                     cell.Arrow = arrow;
                     continue;
                 }
-                if(cell.Arrow && cell.Arrow.Direction == arrow.Direction && ray.includes(gridPath.GetCell(cell.Arrow.HeadCell) as Cell)){
-                    // ahead arrow is 2 cell arrow, merge them
-                    nextarrow = cell;
+                if(cell.Arrow){
+                    if( cell.Arrow.Direction == arrow.Direction && ray.includes(gridPath.GetCell(cell.Arrow.TailCell) as Cell)){
+                        // ahead arrow is 2 cell arrow, merge them
+                        nextarrow = cell;
+                    }
                     break;
                 }
             }
